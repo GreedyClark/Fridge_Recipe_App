@@ -99,3 +99,28 @@ def write_off(user, product, quantity):
             item.delete()
         else:
             item.save(update_fields=["quantity"])
+
+
+
+@dataclass
+class MissingProduct:
+    product: object
+    available: float
+    shortage: float = 0
+    unlocks: int = 0
+
+
+def missing_products(matches, limit=10):
+    found = {}
+    for match in matches:
+        lacking = match.lacking
+        for ingredient in lacking:
+            item = found.setdefault(
+                ingredient.product.pk,
+                MissingProduct(product=ingredient.product, available=ingredient.available),
+            )
+            item.shortage = max(item.shortage, ingredient.shortage)
+            if len(lacking) == 1:
+                item.unlocks += 1
+    items = sorted(found.values(), key=lambda item: (-item.unlocks, item.product.name))
+    return items[:limit]

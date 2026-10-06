@@ -5,8 +5,19 @@ from django.shortcuts import get_object_or_404, redirect
 from django.views import View
 from django.views.generic import DetailView, TemplateView
 
+from fridge.models import FridgeItem
+
 from .models import CookingLog, Recipe
-from .services import ALMOST, READY, fridge_stock, match_recipe, match_recipes, write_off
+from .services import (
+    ALMOST,
+    MISSING,
+    READY,
+    fridge_stock,
+    match_recipe,
+    match_recipes,
+    missing_products,
+    write_off,
+)
 
 LIGHT_CALORIES = 500
 
@@ -59,6 +70,22 @@ class RecipeListView(LoginRequiredMixin, TemplateView):
         context["matches"] = [match for match in matches if passes_filter(match, active)]
         context["query"] = query
         context["active_filter"] = active
+        return context
+
+
+class WhatCanICookView(LoginRequiredMixin, TemplateView):
+    template_name = "recipes/what_can_i_cook.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        matches = match_recipes(self.request.user)
+        context["ready"] = [match for match in matches if match.status == READY]
+        context["almost"] = [match for match in matches if match.status == ALMOST]
+        context["missing"] = [match for match in matches if match.status == MISSING]
+        context["missing_products"] = missing_products(matches)
+        context["product_count"] = (
+            FridgeItem.objects.filter(user=self.request.user).values("product").distinct().count()
+        )
         return context
 
 
