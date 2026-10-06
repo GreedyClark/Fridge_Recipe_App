@@ -39,9 +39,11 @@
                 {% with unit=item.product.get_default_unit_display %}
                     <div class="ingredient-row">
                         <span class="flex-grow-1 fw-semibold">{{ item.product.name }}</span>
-                        <span class="fw-bold text-nowrap">{{ item.needed|floatformat:"-2" }} {{ unit }}</span>
+                        <span class="fw-bold text-nowrap">{% if item.needed is None %}—{% else %}{{ item.needed|floatformat:"-2" }} {{ unit }}{% endif %}</span>
                         <span class="ingredient-have">
-                            {% if item.status == "ready" %}
+                            {% if item.optional %}
+                                <span class="text-secondary">за смаком</span>
+                            {% elif item.status == "ready" %}
                                 <span class="text-accent"><i class="ti ti-check"></i> є {{ item.available|floatformat:"-2" }} {{ unit }}</span>
                             {% elif item.status == "almost" %}
                                 <span class="text-warn">бракує {{ item.shortage|floatformat:"-2" }} {{ unit }}</span>

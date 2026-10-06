@@ -54,7 +54,7 @@
                             <h3 class="recipe-card-title">{{ match.recipe.name }}</h3>
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="kcal"><i class="ti ti-flame"></i>≈ {{ match.nutrition.calories }} ккал</span>
-                                <span class="badge-status badge-ok"><i class="ti ti-check"></i>{{ match.ready_count }} з {{ match.ingredients|length }} інгредієнтів є</span>
+                                <span class="badge-status badge-ok"><i class="ti ti-check"></i>{{ match.ready_count }} з {{ match.required|length }} інгредієнтів є</span>
                             </div>
                         </div>
                     </a>

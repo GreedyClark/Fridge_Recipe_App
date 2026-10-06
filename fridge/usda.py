@@ -108,6 +108,7 @@ def import_product(name, query, unit, grams_per_piece=None, fdc_id=None, session
             "carbs_per_100": pick(nutrients, CARBS_NUMBERS),
             "grams_per_piece": grams_per_piece,
             "usda_fdc_id": food.get("fdcId"),
+            "usda_query": query,
         },
     )
     return product, created, food

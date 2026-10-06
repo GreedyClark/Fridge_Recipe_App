@@ -15,11 +15,14 @@ EPSILON = 1e-6
 @dataclass
 class IngredientCheck:
     product: object
-    needed: float
+    needed: float | None
     available: float
+    optional: bool = False
 
     @property
     def shortage(self):
+        if self.needed is None:
+            return 0
         return max(self.needed - self.available, 0)
 
     @property
@@ -41,8 +44,12 @@ class RecipeMatch:
         self.nutrition = self.recipe.nutrition()
 
     @property
+    def required(self):
+        return [ingredient for ingredient in self.ingredients if not ingredient.optional]
+
+    @property
     def status(self):
-        statuses = {ingredient.status for ingredient in self.ingredients}
+        statuses = {ingredient.status for ingredient in self.required}
         if MISSING in statuses:
             return MISSING
         if ALMOST in statuses:
@@ -51,11 +58,19 @@ class RecipeMatch:
 
     @property
     def ready_count(self):
-        return sum(1 for ingredient in self.ingredients if ingredient.status == READY)
+        return sum(1 for ingredient in self.required if ingredient.status == READY)
 
     @property
     def lacking(self):
-        return [ingredient for ingredient in self.ingredients if ingredient.status != READY]
+        return [ingredient for ingredient in self.required if ingredient.status != READY]
+
+
+@dataclass
+class MissingProduct:
+    product: object
+    available: float
+    shortage: float = 0
+    unlocks: int = 0
 
 
 def fridge_stock(user):
@@ -74,6 +89,7 @@ def match_recipe(recipe, stock):
             product=ingredient.product,
             needed=ingredient.quantity,
             available=stock.get(ingredient.product_id, 0),
+            optional=ingredient.optional,
         )
         for ingredient in recipe.ingredients.all()
     ]
@@ -82,32 +98,8 @@ def match_recipe(recipe, stock):
 
 def match_recipes(user):
     stock = fridge_stock(user)
-    recipes = Recipe.objects.prefetch_related("ingredients__product")
+    recipes = Recipe.objects.visible_to(user).prefetch_related("ingredients__product")
     return [match_recipe(recipe, stock) for recipe in recipes]
-
-
-def write_off(user, product, quantity):
-    remaining = quantity
-    items = FridgeItem.objects.select_for_update().filter(user=user, product=product).order_by("added_at")
-    for item in items:
-        if remaining <= EPSILON:
-            break
-        used = min(item.quantity, remaining)
-        item.quantity -= used
-        remaining -= used
-        if item.quantity <= EPSILON:
-            item.delete()
-        else:
-            item.save(update_fields=["quantity"])
-
-
-
-@dataclass
-class MissingProduct:
-    product: object
-    available: float
-    shortage: float = 0
-    unlocks: int = 0
 
 
 def missing_products(matches, limit=10):
@@ -124,3 +116,18 @@ def missing_products(matches, limit=10):
                 item.unlocks += 1
     items = sorted(found.values(), key=lambda item: (-item.unlocks, item.product.name))
     return items[:limit]
+
+
+def write_off(user, product, quantity):
+    remaining = quantity
+    items = FridgeItem.objects.select_for_update().filter(user=user, product=product).order_by("added_at")
+    for item in items:
+        if remaining <= EPSILON:
+            break
+        used = min(item.quantity, remaining)
+        item.quantity -= used
+        remaining -= used
+        if item.quantity <= EPSILON:
+            item.delete()
+        else:
+            item.save(update_fields=["quantity"])

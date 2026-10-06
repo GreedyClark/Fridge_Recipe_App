@@ -25,6 +25,7 @@ class Product(models.Model):
     carbs_per_100 = models.FloatField("вуглеводи на 100 г", null=True, blank=True)
     grams_per_piece = models.FloatField("вага 1 шт, г", null=True, blank=True)
     usda_fdc_id = models.IntegerField("USDA FDC ID", null=True, blank=True)
+    usda_query = models.CharField("запит до USDA", max_length=255, blank=True)
 
     objects = ProductManager()
 

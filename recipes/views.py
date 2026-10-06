@@ -98,7 +98,9 @@ class WhatCanICookView(LoginRequiredMixin, TemplateView):
 
 class RecipeDetailView(LoginRequiredMixin, DetailView):
     template_name = "recipes/recipe_detail.html"
-    queryset = Recipe.objects.prefetch_related("ingredients__product")
+
+    def get_queryset(self):
+        return Recipe.objects.visible_to(self.request.user).prefetch_related("ingredients__product")
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -108,7 +110,8 @@ class RecipeDetailView(LoginRequiredMixin, DetailView):
 
 class CookRecipeView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        recipe = get_object_or_404(Recipe.objects.prefetch_related("ingredients__product"), pk=pk)
+        recipes = Recipe.objects.visible_to(request.user).prefetch_related("ingredients__product")
+        recipe = get_object_or_404(recipes, pk=pk)
         match = match_recipe(recipe, fridge_stock(request.user))
         if match.status != READY:
             names = ", ".join(ingredient.product.name for ingredient in match.lacking)
@@ -121,10 +124,11 @@ class CookRecipeView(LoginRequiredMixin, View):
                 recipe=recipe,
                 calories_consumed=match.nutrition["calories"],
             )
-            for ingredient in recipe.ingredients.all():
+            required = [ingredient for ingredient in recipe.ingredients.all() if not ingredient.optional]
+            for ingredient in required:
                 write_off(request.user, ingredient.product, ingredient.quantity)
 
-        written_off = ", ".join(str(ingredient) for ingredient in recipe.ingredients.all())
+        written_off = ", ".join(str(ingredient) for ingredient in required)
         messages.success(request, f"Записано! З холодильника списано: {written_off}")
         return redirect("recipes:log")
 
