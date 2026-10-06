@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Fridge Recipe{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Oswald:wght@600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" rel="stylesheet">
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+</head>
+<body class="{% if user.is_authenticated %}has-tabbar{% endif %}">
+{% with view=request.resolver_match.view_name %}
+<header class="app-header">
+    <div class="container-xl d-flex align-items-center gap-4">
+        <a href="{% if user.is_authenticated %}{% url 'fridge:list' %}{% else %}{% url 'login' %}{% endif %}" class="brand">
+            <span class="brand-mark"><i class="ti ti-fridge"></i></span>
+            <span>Fridge Recipe</span>
+        </a>
+
+        {% if user.is_authenticated %}
+            <nav class="d-none d-md-flex gap-1">
+                <a href="{% url 'fridge:list' %}" class="nav-pill {% if view == 'fridge:list' or view == 'fridge:add' or view == 'fridge:edit' or view == 'fridge:delete' %}active{% endif %}">Холодильник</a>
+                <a href="{% url 'recipes:list' %}" class="nav-pill {% if view == 'recipes:list' or view == 'recipes:detail' %}active{% endif %}">Рецепти</a>
+                <a href="{% url 'recipes:what_can_i_cook' %}" class="nav-pill {% if view == 'recipes:what_can_i_cook' %}active{% endif %}">Що приготувати?</a>
+                <a href="{% url 'recipes:log' %}" class="nav-pill {% if view == 'recipes:log' %}active{% endif %}">Журнал</a>
+            </nav>
+
+            <div class="ms-auto d-flex align-items-center gap-3">
+                <span class="avatar">{{ user.username|slice:":2"|upper }}</span>
+                <span class="d-none d-md-inline fw-medium">{{ user.username }}</span>
+                <form method="post" action="{% url 'logout' %}" class="d-none d-md-block m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-logout"></i>Вийти</button>
+                </form>
+            </div>
+        {% else %}
+            <div class="ms-auto d-flex gap-2">
+                <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Увійти</a>
+                <a href="{% url 'signup' %}" class="btn btn-ghost btn-sm">Реєстрація</a>
+            </div>
+        {% endif %}
+    </div>
+</header>
+
+<main class="container-xl py-4 py-md-5">
+    {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрити"></button>
+        </div>
+    {% endfor %}
+
+    {% block content %}{% endblock %}
+</main>
+
+{% if user.is_authenticated %}
+    <nav class="tabbar d-md-none">
+        <a href="{% url 'fridge:list' %}" class="{% if view == 'fridge:list' or view == 'fridge:add' or view == 'fridge:edit' or view == 'fridge:delete' %}active{% endif %}">
+            <span class="tabbar-icon"><i class="ti ti-fridge"></i></span>Холодильник
+        </a>
+        <a href="{% url 'recipes:list' %}" class="{% if view == 'recipes:list' or view == 'recipes:detail' %}active{% endif %}">
+            <span class="tabbar-icon"><i class="ti ti-book"></i></span>Рецепти
+        </a>
+        <a href="{% url 'recipes:what_can_i_cook' %}" class="{% if view == 'recipes:what_can_i_cook' %}active{% endif %}">
+            <span class="tabbar-icon"><i class="ti ti-chef-hat"></i></span>Приготувати
+        </a>
+        <a href="{% url 'recipes:log' %}" class="{% if view == 'recipes:log' %}active{% endif %}">
+            <span class="tabbar-icon"><i class="ti ti-chart-bar"></i></span>Журнал
+        </a>
+    </nav>
+{% endif %}
+{% endwith %}
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
