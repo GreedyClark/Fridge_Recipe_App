@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}Холодильник · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-end gap-3 mb-4">
+    <div class="flex-grow-1">
+        <div class="page-label">Мої продукти</div>
+        <h1 class="page-title">Холодильник</h1>
+    </div>
+    {% if items %}
+        <a href="{% url 'fridge:add' %}" class="btn btn-primary"><i class="ti ti-plus"></i>Додати продукт</a>
+    {% endif %}
+</div>
+
+{% if items %}
+    <div class="row g-3 mb-4">
+        <div class="col-sm-4 col-lg-3">
+            <div class="tile h-100">
+                <span class="tile-label">У холодильнику</span>
+                <span class="tile-value">{{ items|length }}</span>
+            </div>
+        </div>
+        {% if expiring %}
+            <div class="col-sm-8 col-lg-9">
+                <div class="tile tile-warn h-100">
+                    <span class="tile-label"><i class="ti ti-alert-triangle"></i> Термін збігає</span>
+                    <span class="fw-bold">{% for item in expiring %}{{ item.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</span>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="card d-none d-md-block">
+        <div class="table-responsive">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Продукт</th>
+                        <th>Кількість</th>
+                        <th>Додано</th>
+                        <th>Придатний до</th>
+                        <th class="pe-4"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                        <tr>
+                            <td class="ps-4 fw-semibold">{{ item.product.name }}</td>
+                            <td class="fw-semibold">{{ item.quantity|floatformat:"-2" }} {{ item.unit }}</td>
+                            <td class="text-secondary">{{ item.added_at|date:"d.m.Y" }}</td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    {% if item.expiry_date %}{{ item.expiry_date|date:"d.m.Y" }}{% else %}<span class="text-secondary">—</span>{% endif %}
+                                    {% include "fridge/_expiry_badge.html" %}
+                                </div>
+                            </td>
+                            <td class="pe-4 text-end text-nowrap">
+                                <a href="{% url 'fridge:edit' item.pk %}" class="btn btn-icon" aria-label="Редагувати {{ item.product.name }}"><i class="ti ti-pencil"></i></a>
+                                <a href="{% url 'fridge:delete' item.pk %}" class="btn btn-icon text-danger" aria-label="Видалити {{ item.product.name }}"><i class="ti ti-trash"></i></a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card d-md-none">
+        {% for item in items %}
+            <div class="fridge-row">
+                <div class="flex-grow-1 min-w-0">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span class="fw-bold">{{ item.product.name }}</span>
+                        {% include "fridge/_expiry_badge.html" %}
+                    </div>
+                    <div class="text-secondary small">
+                        додано {{ item.added_at|date:"d.m" }}{% if item.expiry_date %} · до {{ item.expiry_date|date:"d.m" }}{% endif %}
+                    </div>
+                </div>
+                <span class="fw-bold text-nowrap">{{ item.quantity|floatformat:"-2" }} {{ item.unit }}</span>
+                <a href="{% url 'fridge:edit' item.pk %}" class="btn btn-icon" aria-label="Редагувати {{ item.product.name }}"><i class="ti ti-pencil"></i></a>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="card">
+        <div class="card-body empty-state">
+            <span class="empty-icon"><i class="ti ti-fridge"></i></span>
+            <h2 class="h3 mb-0">Холодильник порожній</h2>
+            <p class="text-secondary mb-0">Додай продукти, які є вдома, і ми підберемо рецепти з них.</p>
+            <a href="{% url 'fridge:add' %}" class="btn btn-primary btn-lg"><i class="ti ti-plus"></i>Додати перший продукт</a>
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

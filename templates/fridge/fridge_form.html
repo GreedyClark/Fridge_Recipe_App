@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}{% if object %}Редагувати{% else %}Додати продукт{% endif %} · Fridge Recipe{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'fridge:list' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>До холодильника</a>
+
+<div class="mb-4">
+    <div class="page-label">Холодильник</div>
+    <h1 class="page-title">{% if object %}Редагувати{% else %}Додати продукт{% endif %}</h1>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" novalidate class="d-flex flex-column gap-4">
+                    {% csrf_token %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger mb-0">{{ form.non_field_errors|join:" " }}</div>
+                    {% endif %}
+
+                    <div>
+                        <label for="{{ form.product.id_for_label }}" class="form-label">Продукт</label>
+                        {{ form.product }}
+                        {% if form.product.errors %}<div class="field-error">{{ form.product.errors|join:" " }}</div>{% endif %}
+                    </div>
+
+                    {% if not object and popular_products %}
+                        <div>
+                            <div class="text-secondary small fw-semibold mb-2">Часто додають</div>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for product in popular_products %}
+                                    <button type="button" class="chip" data-product-id="{{ product.pk }}">{{ product.name }}</button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <div>
+                        <label for="{{ form.quantity.id_for_label }}" class="form-label">Кількість</label>
+                        <div class="qty-field">
+                            {{ form.quantity }}
+                            <span class="qty-unit" id="unit-badge">—</span>
+                        </div>
+                        {% if form.quantity.errors %}
+                            <div class="field-error">{{ form.quantity.errors|join:" " }}</div>
+                        {% else %}
+                            <div class="form-text">Одиниця береться з продукту автоматично</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <label for="{{ form.expiry_date.id_for_label }}" class="form-label">Придатний до <span class="text-secondary fw-normal">(необов'язково)</span></label>
+                        {{ form.expiry_date }}
+                        {% if form.expiry_date.errors %}<div class="field-error">{{ form.expiry_date.errors|join:" " }}</div>{% endif %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i>Зберегти</button>
+                        <a href="{% url 'fridge:list' %}" class="btn btn-ghost">Скасувати</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="page-label">На 100 г · USDA</div>
+                <div id="usda-empty" class="text-secondary mt-3">Обери продукт, щоб побачити калорійність і БЖУ.</div>
+                <div id="usda-info" class="d-none">
+                    <div class="usda-grid mt-3">
+                        <div class="usda-cell"><span class="tile-label">Ккал</span><span class="usda-value" data-field="calories"></span></div>
+                        <div class="usda-cell"><span class="tile-label">Білки</span><span class="usda-value" data-field="protein" data-suffix=" г"></span></div>
+                        <div class="usda-cell"><span class="tile-label">Жири</span><span class="usda-value" data-field="fat" data-suffix=" г"></span></div>
+                        <div class="usda-cell"><span class="tile-label">Вуглеводи</span><span class="usda-value" data-field="carbs" data-suffix=" г"></span></div>
+                    </div>
+                    <p class="text-secondary small mt-3 mb-0">Значення імпортовано з бази USDA FoodData Central.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{ product_data|json_script:"product-data" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    const products = JSON.parse(document.getElementById("product-data").textContent);
+    const select = document.getElementById("{{ form.product.id_for_label }}");
+    const unitBadge = document.getElementById("unit-badge");
+    const usdaEmpty = document.getElementById("usda-empty");
+    const usdaInfo = document.getElementById("usda-info");
+
+    function formatValue(value, suffix) {
+        if (value === null || value === undefined) {
+            return "—";
+        }
+        return value.toLocaleString("uk-UA") + (suffix || "");
+    }
+
+    function updateProductInfo() {
+        const product = products[select.value];
+        unitBadge.textContent = product ? product.unit : "—";
+        usdaEmpty.classList.toggle("d-none", Boolean(product));
+        usdaInfo.classList.toggle("d-none", !product);
+        if (!product) {
+            return;
+        }
+        usdaInfo.querySelectorAll("[data-field]").forEach((cell) => {
+            cell.textContent = formatValue(product[cell.dataset.field], cell.dataset.suffix);
+        });
+    }
+
+    const productPicker = window.TomSelect
+        ? new TomSelect(select, {
+            maxOptions: null,
+            placeholder: "Почни вводити назву",
+            render: {
+                no_results: () => '<div class="no-results">Нічого не знайдено</div>',
+            },
+        })
+        : null;
+
+    document.querySelectorAll("[data-product-id]").forEach((chip) => {
+        chip.addEventListener("click", () => {
+            if (productPicker) {
+                productPicker.setValue(chip.dataset.productId);
+            } else {
+                select.value = chip.dataset.productId;
+                updateProductInfo();
+            }
+        });
+    });
+
+    select.addEventListener("change", updateProductInfo);
+    updateProductInfo();
+</script>
+{% endblock %}

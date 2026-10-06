@@ -1,0 +1,5 @@
+{% if item.expiry_status == "expired" %}
+    <span class="badge-status badge-danger"><i class="ti ti-alert-circle"></i>Прострочено</span>
+{% elif item.expiry_status == "soon" %}
+    <span class="badge-status badge-warn"><i class="ti ti-alert-triangle"></i>Термін збігає</span>
+{% endif %}
