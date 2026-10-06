@@ -2,11 +2,15 @@ import json
 import socket
 from unittest.mock import Mock, patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase, override_settings
+from google.genai import errors as genai_errors
+
+from fridge.models import Product
 
 from .importing.errors import ImportFailed
-from .importing.extract import extract_recipe
+from .importing.extract import RawRecipe, extract_recipe
 from .importing.fetch import ensure_public_url, fetch_page
+from .importing.gemini import CHECK_QUANTITY, CHOOSE_PRODUCT, parse_recipe
 
 PUBLIC_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
 PRIVATE_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))]
@@ -162,3 +166,104 @@ class FetchPageTests(SimpleTestCase):
         session = self.make_session(response(status=404), response(status=302, location="http://10.0.0.5/"))
         with self.assertRaises(ImportFailed):
             fetch_page("https://example.com/borsch/", session=session)
+
+class GeminiParsingTests(TestCase):
+    def setUp(self):
+        self.buckwheat = Product.objects.create(name="Гречка", default_unit="g", calories_per_100=346)
+        self.eggs = Product.objects.create(name="Яйце куряче", default_unit="pcs", calories_per_100=143, grams_per_piece=50)
+        self.raw = RawRecipe(url="https://example.com/r/", source="text", title="Гречаники", image_url="https://example.com/a.jpg", page_text="...")
+
+    def gemini_returns(self, payload):
+        client = Mock()
+        client.models.generate_content.return_value = Mock(text=json.dumps(payload))
+        return client
+
+    def payload(self, ingredients, **extra):
+        data = {"is_recipe": True, "name": "Гречаники", "servings": 2, "steps": ["Зварити гречку.", " "], "ingredients": ingredients}
+        data.update(extra)
+        return data
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_builds_draft(self):
+        client = self.gemini_returns(self.payload([
+            {"original": "1 склянка гречки", "product_id": self.buckwheat.pk, "unit": "g", "quantity": 165},
+            {"original": "2 яйця", "product_id": self.eggs.pk, "unit": "pcs", "quantity": 2},
+            {"original": "200 г сиру фета", "new_product_name": "Сир фета", "usda_query": "Cheese, feta", "unit": "g", "quantity": 200},
+            {"original": "сіль за смаком", "new_product_name": "Сіль", "usda_query": "Salt, table", "unit": "g", "optional": True},
+        ]))
+
+        draft = parse_recipe(self.raw, client=client)
+
+        self.assertEqual(draft["name"], "Гречаники")
+        self.assertEqual(draft["servings"], 2)
+        self.assertEqual(draft["steps"], ["Зварити гречку."])
+        self.assertEqual(draft["image_url"], "https://example.com/a.jpg")
+        rows = draft["ingredients"]
+        self.assertEqual([row["warning"] for row in rows], ["", "", "", ""])
+        self.assertEqual(rows[0]["product_id"], self.buckwheat.pk)
+        self.assertEqual(rows[2]["new_product_name"], "Сир фета")
+        self.assertTrue(rows[3]["optional"])
+        self.assertIsNone(rows[3]["quantity"])
+        prompt = client.models.generate_content.call_args.kwargs["contents"]
+        self.assertIn(f"{self.eggs.pk} | Яйце куряче | pcs | 50", prompt)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_flags_suspicious_rows(self):
+        client = self.gemini_returns(self.payload([
+            {"original": "яйця", "product_id": self.eggs.pk, "unit": "g", "quantity": 100},
+            {"original": "щось", "product_id": 99999, "unit": "g", "quantity": 10},
+            {"original": "авокадо", "new_product_name": "Авокадо", "usda_query": "Avocados, raw", "unit": "pcs", "quantity": 1},
+            {"original": "гречка", "product_id": self.buckwheat.pk, "unit": "g", "quantity": -5},
+        ], servings=500))
+
+        draft = parse_recipe(self.raw, client=client)
+
+        self.assertEqual(draft["servings"], 1)
+        rows = draft["ingredients"]
+        self.assertEqual(rows[0]["warning"], CHECK_QUANTITY)
+        self.assertEqual(rows[0]["unit"], "pcs")
+        self.assertEqual(rows[1]["warning"], CHOOSE_PRODUCT)
+        self.assertEqual(rows[2]["warning"], CHOOSE_PRODUCT)
+        self.assertEqual(rows[3]["warning"], CHECK_QUANTITY)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_merges_duplicate_products(self):
+        client = self.gemini_returns(self.payload([
+            {"original": "2 яйця для тіста", "product_id": self.eggs.pk, "unit": "pcs", "quantity": 2},
+            {"original": "1 яйце для змащування", "product_id": self.eggs.pk, "unit": "pcs", "quantity": 1},
+        ]))
+        rows = parse_recipe(self.raw, client=client)["ingredients"]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["quantity"], 3)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_not_a_recipe(self):
+        client = self.gemini_returns({"is_recipe": False, "name": "", "servings": 1, "steps": [], "ingredients": []})
+        with self.assertRaises(ImportFailed):
+            parse_recipe(self.raw, client=client)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_invalid_json(self):
+        client = Mock()
+        client.models.generate_content.return_value = Mock(text="це не JSON")
+        with self.assertRaises(ImportFailed):
+            parse_recipe(self.raw, client=client)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_quota_error(self):
+        client = Mock()
+        client.models.generate_content.side_effect = genai_errors.ClientError(429, {"error": {"message": "quota"}})
+        with self.assertRaisesMessage(ImportFailed, "ліміт"):
+            parse_recipe(self.raw, client=client)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_overloaded(self):
+        client = Mock()
+        client.models.generate_content.side_effect = genai_errors.ServerError(503, {"error": {"message": "high demand"}})
+        with self.assertRaisesMessage(ImportFailed, "перевантажений"):
+            parse_recipe(self.raw, client=client)
+
+    @override_settings(GEMINI_API_KEY="", GEMINI_MODEL="model")
+    def test_missing_key(self):
+        with self.assertRaises(ImportFailed):
+            parse_recipe(self.raw, client=Mock())
