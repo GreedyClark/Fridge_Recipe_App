@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Імпорт рецепта · Fridge Recipe{% endblock %}
+
+{% block content %}
+<a href="{% url 'recipes:list' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>До рецептів</a>
+
+<div class="mb-4">
+    <div class="page-label">Рецепти</div>
+    <h1 class="page-title">Імпорт рецепта</h1>
+    <p class="text-secondary mb-0 mt-2 page-lead">Знайшов смачне на іншому сайті? Додай рецепт у свою книгу, і застосунок підбиратиме його за продуктами з холодильника.</p>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" novalidate class="d-flex flex-column gap-4" id="import-form">
+                    {% csrf_token %}
+                    <div>
+                        <label for="{{ form.url.id_for_label }}" class="form-label">{{ form.url.label }}</label>
+                        <div class="icon-field">
+                            <i class="ti ti-link"></i>
+                            {{ form.url }}
+                        </div>
+                        {% if form.url.errors %}
+                            <div class="field-error">{{ form.url.errors|join:" " }}</div>
+                        {% else %}
+                            <div class="form-text">Підходить сторінка з рецептом з будь-якого сайту. Інгредієнти й кроки розбере Gemini, а ти перевіриш їх перед збереженням.</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <button type="submit" class="btn btn-primary" id="import-submit">
+                            <i class="ti ti-download"></i>Розібрати рецепт
+                        </button>
+                        <span class="text-secondary small">Сьогодні: {{ imports_today }} з {{ imports_limit }} імпортів</span>
+                    </div>
+                    <div class="form-text d-none mt-n2" id="import-hint">Зазвичай 10–30 секунд. Не закривай сторінку.</div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5 d-flex flex-column gap-4">
+        <div class="card">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+                <div class="page-label">Як це працює</div>
+                <div class="how-step">
+                    <span class="how-num">1</span>
+                    <div><div class="fw-bold">Встав посилання</div><div class="text-secondary small">Будь-який сайт із рецептом. Сторінку завантажимо один раз.</div></div>
+                </div>
+                <div class="how-step">
+                    <span class="how-num">2</span>
+                    <div><div class="fw-bold">Перевір чернетку</div><div class="text-secondary small">Звір продукти й кількості. Сумнівні рядки підсвічені.</div></div>
+                </div>
+                <div class="how-step">
+                    <span class="how-num">3</span>
+                    <div><div class="fw-bold">Збережи</div><div class="text-secondary small">Рецепт з'явиться в списку з позначкою «Мій». Бачиш його лише ти.</div></div>
+                </div>
+            </div>
+        </div>
+
+        {% if recent_imports %}
+            <div class="card">
+                <div class="card-body p-4 pb-2">
+                    <div class="page-label mb-2">Останні імпорти</div>
+                    {% for item in recent_imports %}
+                        <div class="import-row">
+                            <div class="flex-grow-1 min-w-0">
+                                {% if item.status == "saved" and item.recipe %}
+                                    <a href="{% url 'recipes:detail' item.recipe.pk %}" class="fw-semibold text-reset">{{ item.recipe.name }}</a>
+                                {% elif item.status == "draft" %}
+                                    <a href="{% url 'recipes:import_review' item.pk %}" class="fw-semibold text-reset">{{ item.data.name|default:"Чернетка" }}</a>
+                                {% else %}
+                                    <span class="fw-semibold text-break">{{ item.url|truncatechars:40 }}</span>
+                                {% endif %}
+                                <div class="text-secondary small text-truncate">
+                                    {% if item.status == "failed" %}{{ item.error }}{% else %}{{ item.created_at|date:"j E, H:i" }}{% endif %}
+                                </div>
+                            </div>
+                            {% if item.status == "saved" %}
+                                <span class="badge-status badge-ok">Збережено</span>
+                            {% elif item.status == "draft" %}
+                                <span class="badge-status badge-muted">Чернетка</span>
+                            {% else %}
+                                <span class="badge-status badge-warn">Помилка</span>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.getElementById("import-form").addEventListener("submit", () => {
+        const button = document.getElementById("import-submit");
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Розбираю рецепт…';
+        document.getElementById("import-hint").classList.remove("d-none");
+    });
+</script>
+{% endblock %}

@@ -267,3 +267,29 @@ class GeminiParsingTests(TestCase):
     def test_missing_key(self):
         with self.assertRaises(ImportFailed):
             parse_recipe(self.raw, client=Mock())
+
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="main", GEMINI_FALLBACK_MODELS=["lite"])
+    def test_falls_back_to_next_model(self):
+        client = self.gemini_returns(self.payload([
+            {"original": "2 яйця", "product_id": self.eggs.pk, "unit": "pcs", "quantity": 2},
+        ]))
+        answer = client.models.generate_content.return_value
+        client.models.generate_content.side_effect = [
+            genai_errors.ServerError(503, {"error": {"message": "high demand"}}),
+            answer,
+        ]
+
+        draft = parse_recipe(self.raw, client=client)
+
+        self.assertEqual(draft["ingredients"][0]["quantity"], 2)
+        models = [call.kwargs["model"] for call in client.models.generate_content.call_args_list]
+        self.assertEqual(models, ["main", "lite"])
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="main", GEMINI_FALLBACK_MODELS=["lite"])
+    def test_all_models_overloaded(self):
+        client = Mock()
+        client.models.generate_content.side_effect = genai_errors.ServerError(503, {"error": {"message": "high demand"}})
+        with self.assertRaisesMessage(ImportFailed, "перевантажений"):
+            parse_recipe(self.raw, client=client)
+        self.assertEqual(client.models.generate_content.call_count, 2)

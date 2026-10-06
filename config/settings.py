@@ -89,4 +89,5 @@ MESSAGE_TAGS = {messages.ERROR: "danger"}
 USDA_API_KEY = config("USDA_API_KEY", default="")
 GEMINI_API_KEY = config("GEMINI_API_KEY", default="")
 GEMINI_MODEL = config("GEMINI_MODEL", default="")
+GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="", cast=Csv())
 IMPORTS_PER_DAY = config("IMPORTS_PER_DAY", default=20, cast=int)

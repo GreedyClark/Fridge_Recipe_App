@@ -15,7 +15,9 @@ MAX_SERVINGS = 20
 CHECK_QUANTITY = "Перевір кількість"
 CHOOSE_PRODUCT = "Обери продукт вручну"
 TIMEOUT_MS = 60_000
-RETRY_OPTIONS = types.HttpRetryOptions(attempts=3, initial_delay=2, max_delay=10, http_status_codes=[500, 503, 504])
+RETRY_OPTIONS = types.HttpRetryOptions(attempts=2, initial_delay=2, max_delay=5, http_status_codes=[500, 503, 504])
+QUOTA_EXCEEDED = 429
+UNAVAILABLE = {500, 503, 504}
 
 SYSTEM_INSTRUCTION = """Ти розбираєш кулінарні рецепти для застосунку обліку продуктів.
 Тобі дають довідник продуктів і дані зі сторінки рецепта. Поверни рецепт строго за JSON-схемою.
@@ -84,6 +86,10 @@ def build_prompt(raw, products):
     return "\n".join(parts)
 
 
+def gemini_models():
+    return [settings.GEMINI_MODEL, *[model for model in settings.GEMINI_FALLBACK_MODELS if model]]
+
+
 def ask_gemini(prompt, client=None):
     if not settings.GEMINI_API_KEY or not settings.GEMINI_MODEL:
         raise ImportFailed("Імпорт рецептів зараз недоступний: не налаштовано Gemini.")
@@ -99,16 +105,24 @@ def ask_gemini(prompt, client=None):
         temperature=0.2,
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
     )
-    try:
-        response = client.models.generate_content(model=settings.GEMINI_MODEL, contents=prompt, config=config)
-    except genai_errors.APIError as exc:
-        if exc.code == 429:
-            raise ImportFailed("Вичерпано ліміт запитів до Gemini. Спробуй трохи пізніше.") from exc
-        if exc.code == 503:
-            raise ImportFailed("Gemini зараз перевантажений. Спробуй через кілька хвилин.") from exc
-        raise ImportFailed("Сервіс розбору рецептів зараз недоступний. Спробуй пізніше.") from exc
-    except httpx.TimeoutException as exc:
-        raise ImportFailed("Gemini не відповів вчасно. Спробуй ще раз.") from exc
+
+    response = None
+    error = None
+    for model in gemini_models():
+        try:
+            response = client.models.generate_content(model=model, contents=prompt, config=config)
+            break
+        except genai_errors.APIError as exc:
+            if exc.code != QUOTA_EXCEEDED and exc.code not in UNAVAILABLE:
+                raise ImportFailed("Сервіс розбору рецептів зараз недоступний. Спробуй пізніше.") from exc
+            error = exc
+        except httpx.TimeoutException as exc:
+            error = exc
+
+    if response is None:
+        if isinstance(error, genai_errors.APIError) and error.code == QUOTA_EXCEEDED:
+            raise ImportFailed("Вичерпано ліміт запитів до Gemini. Спробуй трохи пізніше.") from error
+        raise ImportFailed("Gemini зараз перевантажений. Спробуй через кілька хвилин.") from error
 
     try:
         return ParsedRecipe.model_validate_json(response.text or "")

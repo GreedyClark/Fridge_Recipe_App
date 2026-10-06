@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
@@ -8,11 +9,14 @@ from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect
 from django.utils import timezone
 from django.views import View
-from django.views.generic import DetailView, ListView, TemplateView
+from django.views.generic import DetailView, FormView, ListView, TemplateView
 
-from fridge.models import FridgeItem
+from fridge.models import FridgeItem, Product
 
-from .models import CookingLog, Recipe
+from .forms import RecipeImportForm
+from .importing.errors import ImportFailed
+from .importing.pipeline import run_import
+from .models import CookingLog, Recipe, RecipeImport
 from .services import (
     ALMOST,
     MISSING,
@@ -26,6 +30,7 @@ from .services import (
 
 LIGHT_CALORIES = 500
 LOG_LIMIT = 50
+RECENT_IMPORTS = 5
 WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
 FILTERS = [
@@ -181,4 +186,63 @@ class CookingLogListView(LoginRequiredMixin, ListView):
             "week_total": week_total,
             "week_average": round(week_total / 7),
         })
+        return context
+
+
+class RecipeImportView(LoginRequiredMixin, FormView):
+    template_name = "recipes/recipe_import.html"
+    form_class = RecipeImportForm
+
+    def imports_today(self):
+        day_start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+        return self.request.user.recipe_imports.filter(created_at__gte=day_start).count()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["imports_today"] = self.imports_today()
+        context["imports_limit"] = settings.IMPORTS_PER_DAY
+        context["recent_imports"] = self.request.user.recipe_imports.select_related("recipe")[:RECENT_IMPORTS]
+        return context
+
+    def form_valid(self, form):
+        url = form.cleaned_data["url"]
+        user = self.request.user
+
+        recipe = Recipe.objects.filter(owner=user, source_url=url).first()
+        if recipe:
+            messages.info(self.request, "Цей рецепт уже є у твоїй книзі.")
+            return redirect("recipes:detail", pk=recipe.pk)
+
+        draft = user.recipe_imports.filter(url=url, status=RecipeImport.DRAFT).first()
+        if draft:
+            messages.info(self.request, "Цей рецепт уже розібрано. Перевір чернетку.")
+            return redirect("recipes:import_review", pk=draft.pk)
+
+        if self.imports_today() >= settings.IMPORTS_PER_DAY:
+            form.add_error("url", f"На сьогодні ліміт вичерпано ({settings.IMPORTS_PER_DAY} імпортів). Спробуй завтра.")
+            return self.form_invalid(form)
+
+        record = RecipeImport.objects.create(user=user, url=url)
+        try:
+            run_import(record)
+        except ImportFailed as exc:
+            form.add_error("url", str(exc))
+            return self.form_invalid(form)
+        return redirect("recipes:import_review", pk=record.pk)
+
+
+class ImportReviewView(LoginRequiredMixin, DetailView):
+    template_name = "recipes/import_review.html"
+    context_object_name = "record"
+
+    def get_queryset(self):
+        return self.request.user.recipe_imports.filter(status=RecipeImport.DRAFT)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        rows = self.object.data.get("ingredients", [])
+        products = Product.objects.in_bulk([row["product_id"] for row in rows if row.get("product_id")])
+        for row in rows:
+            row["product"] = products.get(row.get("product_id"))
+        context["rows"] = rows
         return context

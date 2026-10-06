@@ -3,9 +3,12 @@
 {% block title %}Рецепти · Fridge Recipe{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <div class="page-label">Усі рецепти</div>
-    <h1 class="page-title">Рецепти</h1>
+<div class="d-flex flex-wrap align-items-end justify-content-between gap-3 mb-4">
+    <div>
+        <div class="page-label">Усі рецепти</div>
+        <h1 class="page-title">Рецепти</h1>
+    </div>
+    <a href="{% url 'recipes:import' %}" class="btn btn-primary"><i class="ti ti-download"></i>Імпортувати рецепт</a>
 </div>
 
 <form method="get" class="search-box mb-3" role="search">

@@ -936,3 +936,58 @@ h1, h2, h3, .display-num {
 .log-thumb i {
     font-size: 1.25rem;
 }
+
+.page-lead {
+    max-width: 640px;
+}
+
+.icon-field {
+    position: relative;
+}
+
+.icon-field > i {
+    position: absolute;
+    top: 50%;
+    left: 1rem;
+    transform: translateY(-50%);
+    color: var(--fr-muted);
+    font-size: 1.25rem;
+    pointer-events: none;
+}
+
+.icon-field .form-control {
+    padding-left: 3rem;
+}
+
+.how-step {
+    display: flex;
+    gap: .875rem;
+}
+
+.how-num {
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--fr-display);
+    font-weight: 700;
+}
+
+.import-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .75rem 0;
+    border-top: 1px solid var(--fr-line);
+}
+
+.btn .spinner-border-sm {
+    width: 1rem;
+    height: 1rem;
+    border-width: .15em;
+}

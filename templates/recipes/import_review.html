@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Перевір рецепт · Fridge Recipe{% endblock %}
+
+{% block content %}
+<a href="{% url 'recipes:import' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>Інше посилання</a>
+
+<div class="mb-4">
+    <div class="page-label">Імпорт · {{ record.url|truncatechars:60 }}</div>
+    <h1 class="page-title">{{ record.data.name }}</h1>
+    <p class="text-secondary mb-0 mt-2">Порцій: {{ record.data.servings }}</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body p-4">
+        <h2 class="h4">Інгредієнти</h2>
+        {% for row in rows %}
+            <div class="import-row">
+                <div class="flex-grow-1 min-w-0">
+                    <div class="fw-semibold">
+                        {% if row.product %}{{ row.product.name }}{% elif row.new_product_name %}{{ row.new_product_name }} <span class="badge-status badge-ok">новий · {{ row.usda_query }}</span>{% else %}—{% endif %}
+                        · {{ row.quantity|default:"—" }} {{ row.unit }}{% if row.optional %} · за смаком{% endif %}
+                    </div>
+                    <div class="text-secondary small">З сайту: «{{ row.original }}»</div>
+                </div>
+                {% if row.warning %}<span class="badge-status badge-warn"><i class="ti ti-alert-triangle"></i>{{ row.warning }}</span>{% endif %}
+            </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-4">
+        <h2 class="h4">Кроки</h2>
+        <ol class="mb-0">
+            {% for step in record.data.steps %}<li class="mb-2">{{ step }}</li>{% endfor %}
+        </ol>
+    </div>
+</div>
+{% endblock %}
