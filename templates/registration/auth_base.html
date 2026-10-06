@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-5 align-items-center py-md-4">
+    <div class="col-lg-7">
+        <h1 class="auth-title">Що є в холодильнику —<br><span class="text-accent">те й на вечерю</span></h1>
+        <p class="auth-lead">Додавай продукти, отримуй рецепти з того, що вже є вдома, і рахуй калорії без зайвих таблиць.</p>
+        <div class="row g-3 d-none d-md-flex">
+            <div class="col-4">
+                <div class="tile h-100">
+                    <span class="tile-label">Холодильник</span>
+                    <span class="fw-bold">Продукти й терміни придатності</span>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="tile h-100">
+                    <span class="tile-label">Рецепти</span>
+                    <span class="fw-bold">З того, що вже є вдома</span>
+                </div>
+            </div>
+            <div class="col-4">
+                <div class="tile h-100">
+                    <span class="tile-label">Калорії</span>
+                    <span class="fw-bold">За даними USDA</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body p-4 p-md-5">
+                {% block form %}{% endblock %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

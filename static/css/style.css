@@ -437,3 +437,30 @@ h1, h2, h3, .display-num {
         min-height: 60px;
     }
 }
+.auth-title {
+    font-family: var(--fr-display);
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: clamp(2.75rem, 7vw, 5.25rem);
+    line-height: .95;
+    margin: 0 0 1.5rem;
+}
+
+.auth-lead {
+    color: var(--fr-muted);
+    font-size: 1.125rem;
+    line-height: 1.5;
+    max-width: 30rem;
+    margin-bottom: 2rem;
+}
+
+.field-error {
+    color: var(--fr-danger);
+    font-size: .875rem;
+    margin-top: .375rem;
+}
+
+.form-text ul {
+    padding-left: 1.1rem;
+    margin: .375rem 0 0;
+}
