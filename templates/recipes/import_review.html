@@ -2,39 +2,186 @@
 
 {% block title %}Перевір рецепт · Fridge Recipe{% endblock %}
 
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
 {% block content %}
 <a href="{% url 'recipes:import' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>Інше посилання</a>
 
 <div class="mb-4">
-    <div class="page-label">Імпорт · {{ record.url|truncatechars:60 }}</div>
-    <h1 class="page-title">{{ record.data.name }}</h1>
-    <p class="text-secondary mb-0 mt-2">Порцій: {{ record.data.servings }}</p>
+    <div class="page-label">Імпорт · {{ source_domain }}</div>
+    <h1 class="page-title">Перевір рецепт</h1>
+    <p class="text-secondary mb-0 mt-2">Це чернетка: поки ти не натиснеш «Зберегти рецепт», нічого не записується.</p>
 </div>
 
-<div class="card mb-4">
-    <div class="card-body p-4">
-        <h2 class="h4">Інгредієнти</h2>
-        {% for row in rows %}
-            <div class="import-row">
-                <div class="flex-grow-1 min-w-0">
-                    <div class="fw-semibold">
-                        {% if row.product %}{{ row.product.name }}{% elif row.new_product_name %}{{ row.new_product_name }} <span class="badge-status badge-ok">новий · {{ row.usda_query }}</span>{% else %}—{% endif %}
-                        · {{ row.quantity|default:"—" }} {{ row.unit }}{% if row.optional %} · за смаком{% endif %}
+{% if has_errors %}
+    <div class="import-banner mb-4">
+        <i class="ti ti-alert-triangle"></i>
+        <span class="fw-bold">Виправ позначені поля</span>
+        {% for error in recipe_form.non_field_errors %}<span class="text-secondary">{{ error }}</span>{% endfor %}
+        {% for error in formset.non_form_errors %}<span class="text-secondary">{{ error }}</span>{% endfor %}
+    </div>
+{% elif warning_count %}
+    <div class="import-banner mb-4">
+        <i class="ti ti-alert-triangle"></i>
+        <span class="fw-bold">Рядків, що потребують уваги: {{ warning_count }}</span>
+        <span class="text-secondary">Решту Gemini зіставив з довідником. Нові продукти додамо з USDA під час збереження.</span>
+    </div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate id="review-form">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <div class="row g-4 align-items-start">
+        <div class="col-lg-8 d-flex flex-column gap-4">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-sm-9">
+                            <label for="{{ recipe_form.name.id_for_label }}" class="form-label">{{ recipe_form.name.label }}</label>
+                            {{ recipe_form.name }}
+                            {% if recipe_form.name.errors %}<div class="field-error">{{ recipe_form.name.errors|join:" " }}</div>{% endif %}
+                        </div>
+                        <div class="col-sm-3">
+                            <label for="{{ recipe_form.servings.id_for_label }}" class="form-label">{{ recipe_form.servings.label }}</label>
+                            {{ recipe_form.servings }}
+                            {% if recipe_form.servings.errors %}<div class="field-error">{{ recipe_form.servings.errors|join:" " }}</div>{% endif %}
+                        </div>
                     </div>
-                    <div class="text-secondary small">З сайту: «{{ row.original }}»</div>
                 </div>
-                {% if row.warning %}<span class="badge-status badge-warn"><i class="ti ti-alert-triangle"></i>{{ row.warning }}</span>{% endif %}
             </div>
-        {% endfor %}
-    </div>
-</div>
 
-<div class="card">
-    <div class="card-body p-4">
-        <h2 class="h4">Кроки</h2>
-        <ol class="mb-0">
-            {% for step in record.data.steps %}<li class="mb-2">{{ step }}</li>{% endfor %}
-        </ol>
+            <div class="card">
+                <div class="card-body p-4 d-flex flex-column gap-3">
+                    <h2 class="h3 mb-0">Інгредієнти</h2>
+                    <div class="d-flex flex-column gap-3" id="ingredient-list">
+                        {% for form in formset %}
+                            {% include "recipes/_import_ingredient.html" %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-ghost align-self-start" id="add-ingredient"><i class="ti ti-plus"></i>Додати інгредієнт</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-4 d-flex flex-column gap-3">
+                    <h2 class="h3 mb-0">Кроки</h2>
+                    <div class="d-flex flex-column gap-3" id="step-list">
+                        {% for step in steps %}
+                            <div class="import-step" data-step>
+                                <span class="how-num muted">{{ forloop.counter }}</span>
+                                <label class="visually-hidden" for="step-{{ forloop.counter }}">Крок {{ forloop.counter }}</label>
+                                <textarea id="step-{{ forloop.counter }}" name="steps" rows="2" class="form-control">{{ step }}</textarea>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-ghost align-self-start" id="add-step"><i class="ti ti-plus"></i>Додати крок</button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary" id="save-recipe"><i class="ti ti-check"></i>Зберегти рецепт</button>
+                <a href="{% url 'recipes:import' %}" class="btn btn-ghost">Скасувати</a>
+            </div>
+        </div>
+
+        <div class="col-lg-4 order-first order-lg-last">
+            <div class="card overflow-hidden">
+                {% if image_url %}
+                    <img src="{{ image_url }}" alt="Фото страви" class="photo import-photo" referrerpolicy="no-referrer"
+                         onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+                    <div class="photo-placeholder import-photo d-none"><i class="ti ti-camera"></i><span>Фото недоступне</span></div>
+                    <div class="photo-credit">Фото: {{ source_domain }}</div>
+                {% else %}
+                    <div class="photo-placeholder import-photo"><i class="ti ti-camera"></i><span>На сторінці немає фото</span></div>
+                {% endif %}
+                <div class="card-body p-4 d-flex flex-column gap-3">
+                    <a href="{{ source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ source_domain }}</a>
+                    <div class="d-flex gap-2 text-secondary small">
+                        <i class="ti ti-lock text-accent"></i>
+                        <span>Рецепт бачиш лише ти. Фото не копіюємо, а показуємо з сайту-джерела.</span>
+                    </div>
+                    <div>
+                        <label for="{{ recipe_form.image.id_for_label }}" class="form-label">Своє фото <span class="text-secondary fw-normal">(необов'язково)</span></label>
+                        {{ recipe_form.image }}
+                        {% if recipe_form.image.errors %}<div class="field-error">{{ recipe_form.image.errors|join:" " }}</div>{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-</div>
+</form>
+
+<template id="empty-ingredient">
+    {% with form=formset.empty_form %}{% include "recipes/_import_ingredient.html" %}{% endwith %}
+</template>
+
+{{ product_units|json_script:"product-units" }}
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    const units = JSON.parse(document.getElementById("product-units").textContent);
+    const list = document.getElementById("ingredient-list");
+    const totalForms = document.getElementById("id_ingredients-TOTAL_FORMS");
+
+    function setupIngredient(row) {
+        const select = row.querySelector(".js-product");
+        const unitBadge = row.querySelector("[data-unit]");
+        const newProduct = row.querySelector("[data-new-product]");
+
+        select.addEventListener("change", () => {
+            if (select.value) {
+                unitBadge.textContent = units[select.value] || "—";
+                if (newProduct) {
+                    newProduct.classList.add("d-none");
+                }
+            }
+        });
+
+        if (window.TomSelect) {
+            new TomSelect(select, {
+                maxOptions: null,
+                allowEmptyOption: false,
+                placeholder: newProduct ? "Або обери зі списку" : "Почни вводити назву",
+                render: {
+                    no_results: () => '<div class="no-results">Нічого не знайдено</div>',
+                },
+            });
+        }
+
+        row.querySelector("[data-remove]").addEventListener("click", () => {
+            row.querySelector("input[name$='-DELETE']").checked = true;
+            row.classList.add("d-none");
+        });
+    }
+
+    list.querySelectorAll("[data-ingredient]").forEach(setupIngredient);
+
+    document.getElementById("add-ingredient").addEventListener("click", () => {
+        const index = Number(totalForms.value);
+        const html = document.getElementById("empty-ingredient").innerHTML.replaceAll("__prefix__", index);
+        list.insertAdjacentHTML("beforeend", html);
+        totalForms.value = index + 1;
+        setupIngredient(list.lastElementChild);
+    });
+
+    document.getElementById("add-step").addEventListener("click", () => {
+        const steps = document.getElementById("step-list");
+        const number = steps.querySelectorAll("[data-step]").length + 1;
+        steps.insertAdjacentHTML("beforeend",
+            `<div class="import-step" data-step><span class="how-num muted">${number}</span>` +
+            `<label class="visually-hidden" for="step-${number}">Крок ${number}</label>` +
+            `<textarea id="step-${number}" name="steps" rows="2" class="form-control"></textarea></div>`);
+        steps.lastElementChild.querySelector("textarea").focus();
+    });
+
+    document.getElementById("review-form").addEventListener("submit", () => {
+        const button = document.getElementById("save-recipe");
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Зберігаю…';
+    });
+</script>
 {% endblock %}

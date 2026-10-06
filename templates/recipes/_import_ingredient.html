@@ -1,0 +1,32 @@
+<div class="import-item{% if form.warning or form.errors %} has-warning{% endif %}" data-ingredient>
+    {% for field in form.hidden_fields %}{{ field }}{% endfor %}
+    <div class="import-item-head">
+        <span class="text-secondary small">{% if form.original.value %}З сайту: «{{ form.original.value }}»{% else %}Новий рядок{% endif %}</span>
+        {% if form.warning and not form.errors %}<span class="warn-text"><i class="ti ti-alert-triangle"></i>{{ form.warning }}</span>{% endif %}
+    </div>
+    <div class="import-fields">
+        <div class="import-product min-w-0">
+            <label for="{{ form.product.id_for_label }}" class="visually-hidden">Продукт</label>
+            {{ form.product }}
+            {% if form.new_product_label %}
+                <span class="new-product" data-new-product><i class="ti ti-plus"></i>Новий продукт: {{ form.new_product_label }} · USDA: {{ form.usda_query.value }}</span>
+            {% endif %}
+            {% if form.product.errors %}<div class="field-error">{{ form.product.errors|join:" " }}</div>{% endif %}
+        </div>
+        <div class="import-qty">
+            <label for="{{ form.quantity.id_for_label }}" class="visually-hidden">Кількість</label>
+            <div class="qty-field">
+                {{ form.quantity }}
+                <span class="qty-unit" data-unit>{{ form.unit|default:"—" }}</span>
+            </div>
+            {% if form.quantity.errors %}<div class="field-error">{{ form.quantity.errors|join:" " }}</div>{% endif %}
+        </div>
+        <label class="import-optional" for="{{ form.optional.id_for_label }}">
+            {{ form.optional }}за смаком
+        </label>
+        <div class="import-remove">
+            <span class="d-none">{{ form.DELETE }}</span>
+            <button type="button" class="btn btn-icon" data-remove aria-label="Прибрати інгредієнт"><i class="ti ti-x"></i></button>
+        </div>
+    </div>
+</div>

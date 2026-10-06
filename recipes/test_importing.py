@@ -293,3 +293,13 @@ class GeminiParsingTests(TestCase):
         with self.assertRaisesMessage(ImportFailed, "перевантажений"):
             parse_recipe(self.raw, client=client)
         self.assertEqual(client.models.generate_content.call_count, 2)
+
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_water_is_always_optional(self):
+        client = self.gemini_returns(self.payload([
+            {"original": "200 мл води", "new_product_name": "Вода", "usda_query": "Water, tap", "unit": "ml", "quantity": 200},
+        ]))
+        row = parse_recipe(self.raw, client=client)["ingredients"][0]
+        self.assertTrue(row["optional"])
+        self.assertEqual(row["quantity"], 200)

@@ -1,4 +1,5 @@
 from datetime import timedelta
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.contrib import messages
@@ -6,16 +7,17 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views import View
 from django.views.generic import DetailView, FormView, ListView, TemplateView
 
 from fridge.models import FridgeItem, Product
 
-from .forms import RecipeImportForm
+from .forms import UNIT_LABELS, ImportedIngredientFormSet, ImportedRecipeForm, RecipeImportForm
 from .importing.errors import ImportFailed
 from .importing.pipeline import run_import
+from .importing.save import RowFailed, save_import
 from .models import CookingLog, Recipe, RecipeImport
 from .services import (
     ALMOST,
@@ -231,18 +233,80 @@ class RecipeImportView(LoginRequiredMixin, FormView):
         return redirect("recipes:import_review", pk=record.pk)
 
 
-class ImportReviewView(LoginRequiredMixin, DetailView):
+def ingredient_initial(row):
+    quantity = row.get("quantity")
+    if quantity is not None and float(quantity).is_integer():
+        quantity = int(quantity)
+    return {
+        "original": row.get("original", ""),
+        "product": row.get("product_id"),
+        "new_product_name": row.get("new_product_name", ""),
+        "usda_query": row.get("usda_query", ""),
+        "new_unit": row.get("unit", "g"),
+        "grams_per_piece": row.get("grams_per_piece"),
+        "quantity": quantity,
+        "optional": row.get("optional", False),
+    }
+
+
+class ImportReviewView(LoginRequiredMixin, View):
     template_name = "recipes/import_review.html"
-    context_object_name = "record"
 
-    def get_queryset(self):
-        return self.request.user.recipe_imports.filter(status=RecipeImport.DRAFT)
+    def get_record(self):
+        return get_object_or_404(self.request.user.recipe_imports, pk=self.kwargs["pk"], status=RecipeImport.DRAFT)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        rows = self.object.data.get("ingredients", [])
-        products = Product.objects.in_bulk([row["product_id"] for row in rows if row.get("product_id")])
-        for row in rows:
-            row["product"] = products.get(row.get("product_id"))
-        context["rows"] = rows
-        return context
+    def get(self, request, pk):
+        record = self.get_record()
+        data = record.data
+        recipe_form = ImportedRecipeForm(initial={"name": data.get("name"), "servings": data.get("servings")})
+        rows = data.get("ingredients", [])
+        formset = ImportedIngredientFormSet(prefix="ingredients", initial=[ingredient_initial(row) for row in rows])
+        for form, row in zip(formset.forms, rows):
+            form.warning = row.get("warning", "")
+        return self.render(record, recipe_form, formset, data.get("steps", []))
+
+    def post(self, request, pk):
+        record = self.get_record()
+        recipe_form = ImportedRecipeForm(request.POST, request.FILES)
+        formset = ImportedIngredientFormSet(request.POST, prefix="ingredients")
+        steps = [step.strip() for step in request.POST.getlist("steps") if step.strip()]
+
+        recipe_valid = recipe_form.is_valid()
+        formset_valid = formset.is_valid()
+        forms_valid = recipe_valid and formset_valid
+        if not steps:
+            recipe_form.add_error(None, "Додай хоча б один крок приготування.")
+
+        if forms_valid and steps:
+            kept = formset.kept_forms()
+            try:
+                recipe = save_import(record, recipe_form.cleaned_data, [form.cleaned_data for form in kept], steps)
+            except RowFailed as exc:
+                kept[exc.index].add_error("product", str(exc))
+            except ImportFailed as exc:
+                recipe_form.add_error(None, str(exc))
+            else:
+                messages.success(request, f"Рецепт «{recipe.name}» збережено. Його бачиш лише ти.")
+                return redirect("recipes:detail", pk=recipe.pk)
+
+        return self.render(record, recipe_form, formset, steps or request.POST.getlist("steps"))
+
+    def render(self, record, recipe_form, formset, steps):
+        units = {str(product.pk): product.get_default_unit_display() for product in Product.objects.all()}
+        for form in formset.forms:
+            product_id = str(form.value_of("product"))
+            form.unit = units.get(product_id) or UNIT_LABELS.get(form.value_of("new_unit"), "—")
+        source_url = record.data.get("source_url") or record.url
+        context = {
+            "record": record,
+            "recipe_form": recipe_form,
+            "formset": formset,
+            "steps": steps or [""],
+            "warning_count": sum(1 for form in formset.forms if form.warning),
+            "has_errors": bool(recipe_form.errors or formset.total_error_count()),
+            "image_url": record.data.get("image_url", ""),
+            "source_url": source_url,
+            "source_domain": urlparse(source_url).netloc.removeprefix("www."),
+            "product_units": units,
+        }
+        return render(self.request, self.template_name, context)

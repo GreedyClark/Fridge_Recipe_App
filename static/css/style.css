@@ -991,3 +991,132 @@ h1, h2, h3, .display-num {
     height: 1rem;
     border-width: .15em;
 }
+
+.import-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem 1rem;
+    background: rgba(245, 190, 85, .1);
+    border: 1px solid rgba(245, 190, 85, .4);
+    border-radius: 16px;
+    padding: .875rem 1.125rem;
+}
+
+.import-banner > i {
+    color: var(--fr-warn);
+    font-size: 1.25rem;
+}
+
+.import-item {
+    border: 1px solid var(--fr-line);
+    border-radius: 16px;
+    padding: .875rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: .625rem;
+}
+
+.import-item.has-warning {
+    background: rgba(245, 190, 85, .07);
+    border-color: rgba(245, 190, 85, .45);
+}
+
+.import-item-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .25rem .75rem;
+}
+
+.warn-text {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    color: var(--fr-warn);
+    font-size: .85rem;
+    font-weight: 700;
+}
+
+.import-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 2.2fr) minmax(140px, 1fr) auto auto;
+    gap: .75rem;
+    align-items: start;
+}
+
+.import-fields .qty-field .form-control {
+    font-size: 1.125rem;
+}
+
+.import-optional {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    min-height: 44px;
+    color: var(--fr-muted);
+    font-size: .9rem;
+    font-weight: 600;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.import-optional input {
+    margin: 0;
+    width: 1.25rem;
+    height: 1.25rem;
+    accent-color: var(--fr-accent);
+}
+
+.new-product {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    margin-top: .5rem;
+    background: rgba(211, 242, 58, .12);
+    color: var(--fr-accent);
+    border: 1px solid rgba(211, 242, 58, .35);
+    border-radius: 999px;
+    padding: .2rem .7rem;
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.import-step {
+    display: flex;
+    align-items: flex-start;
+    gap: .75rem;
+}
+
+.how-num.muted {
+    margin-top: .5rem;
+    background: var(--fr-surface-2);
+    color: var(--fr-text);
+}
+
+.import-photo {
+    height: 220px;
+}
+
+.photo-credit {
+    padding: .5rem 1rem;
+    color: var(--fr-muted);
+    font-size: .75rem;
+    border-bottom: 1px solid var(--fr-line);
+}
+
+@media (max-width: 767.98px) {
+    .import-fields {
+        grid-template-columns: minmax(0, 1fr) auto;
+    }
+
+    .import-product,
+    .import-optional {
+        grid-column: 1 / -1;
+    }
+
+    .import-optional {
+        order: 3;
+    }
+}
