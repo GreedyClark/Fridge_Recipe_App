@@ -1,0 +1,14 @@
+{% load recipe_extras %}
+{% if match.status == "ready" %}
+    <span class="badge-status badge-ok"><i class="ti ti-check"></i>Можна приготувати</span>
+{% elif match.status == "almost" %}
+    {% with first=match.lacking.0 count=match.lacking|length %}
+        <span class="badge-status badge-warn">
+            {% if count == 1 %}Майже: {{ first.product.name }}, ще {{ first.shortage|floatformat:"-2" }} {{ first.product.get_default_unit_display }}{% else %}Майже: бракує {{ count }} {{ count|uk_plural:"інгредієнта,інгредієнтів,інгредієнтів" }}{% endif %}
+        </span>
+    {% endwith %}
+{% else %}
+    {% with count=match.lacking|length %}
+        <span class="badge-status badge-muted">Бракує {{ count }} {{ count|uk_plural:"продукту,продуктів,продуктів" }}</span>
+    {% endwith %}
+{% endif %}

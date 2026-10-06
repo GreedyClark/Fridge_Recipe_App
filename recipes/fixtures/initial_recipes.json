@@ -1,0 +1,125 @@
+[
+    {
+        "model": "recipes.recipe",
+        "pk": 1,
+        "fields": {
+            "name": "Омлет із сиром",
+            "instructions": "Збийте яйця виделкою з дрібкою солі.\nНатріть сир на дрібній тертці.\nРозтопіть масло на сковороді на середньому вогні.\nВилийте яйця, накрийте кришкою й готуйте 3–4 хвилини.\nПосипте сиром, складіть омлет навпіл і подавайте.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 1, "fields": {"recipe": 1, "product": ["Яйце куряче"], "quantity": 3}},
+    {"model": "recipes.recipeingredient", "pk": 2, "fields": {"recipe": 1, "product": ["Сир твердий"], "quantity": 50}},
+    {"model": "recipes.recipeingredient", "pk": 3, "fields": {"recipe": 1, "product": ["Вершкове масло"], "quantity": 10}},
+    {
+        "model": "recipes.recipe",
+        "pk": 2,
+        "fields": {
+            "name": "Гречка з куркою",
+            "instructions": "Промийте гречку, залийте водою у співвідношенні 1:2, посоліть і варіть під кришкою 15–20 хвилин.\nНаріжте куряче філе кубиками, цибулю — півкільцями.\nРозігрійте олію, обсмажте цибулю до золотистого кольору, додайте курку й смажте 7–10 хвилин.\nЗмішайте курку з готовою гречкою, прогрійте разом 2–3 хвилини й подавайте.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 4, "fields": {"recipe": 2, "product": ["Гречка"], "quantity": 150}},
+    {"model": "recipes.recipeingredient", "pk": 5, "fields": {"recipe": 2, "product": ["Куряче філе"], "quantity": 200}},
+    {"model": "recipes.recipeingredient", "pk": 6, "fields": {"recipe": 2, "product": ["Цибуля"], "quantity": 50}},
+    {"model": "recipes.recipeingredient", "pk": 7, "fields": {"recipe": 2, "product": ["Олія соняшникова"], "quantity": 20}},
+    {
+        "model": "recipes.recipe",
+        "pk": 3,
+        "fields": {
+            "name": "Картопляне пюре з котлетою",
+            "instructions": "Очистіть картоплю, наріжте й варіть у підсоленій воді 20 хвилин до м'якості.\nЗмішайте фарш з яйцем, сіллю й перцем, сформуйте дві котлети.\nОбсмажте котлети на сковороді по 5–6 хвилин з кожного боку.\nЗлийте воду з картоплі, додайте гаряче молоко й розімніть у пюре.\nПодавайте пюре з котлетами.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 8, "fields": {"recipe": 3, "product": ["Картопля"], "quantity": 400}},
+    {"model": "recipes.recipeingredient", "pk": 9, "fields": {"recipe": 3, "product": ["Молоко 2.5%"], "quantity": 50}},
+    {"model": "recipes.recipeingredient", "pk": 10, "fields": {"recipe": 3, "product": ["Фарш змішаний"], "quantity": 200}},
+    {"model": "recipes.recipeingredient", "pk": 11, "fields": {"recipe": 3, "product": ["Яйце куряче"], "quantity": 1}},
+    {
+        "model": "recipes.recipe",
+        "pk": 4,
+        "fields": {
+            "name": "Салат з огірків і помідорів",
+            "instructions": "Помийте огірки й помідори.\nНаріжте овочі часточками.\nПосоліть, полийте олією й перемішайте перед подачею.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 12, "fields": {"recipe": 4, "product": ["Огірок"], "quantity": 150}},
+    {"model": "recipes.recipeingredient", "pk": 13, "fields": {"recipe": 4, "product": ["Помідор"], "quantity": 150}},
+    {"model": "recipes.recipeingredient", "pk": 14, "fields": {"recipe": 4, "product": ["Олія соняшникова"], "quantity": 20}},
+    {
+        "model": "recipes.recipe",
+        "pk": 5,
+        "fields": {
+            "name": "Рис з лососем",
+            "instructions": "Промийте рис і варіть у підсоленій воді 15–18 хвилин.\nНатріть моркву й обсмажте її 3 хвилини на сухій сковороді.\nПосоліть лосось і запікайте при 200 °C 12–15 хвилин.\nЗмішайте рис з морквою й подавайте з лососем.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 15, "fields": {"recipe": 5, "product": ["Рис"], "quantity": 150}},
+    {"model": "recipes.recipeingredient", "pk": 16, "fields": {"recipe": 5, "product": ["Лосось"], "quantity": 200}},
+    {"model": "recipes.recipeingredient", "pk": 17, "fields": {"recipe": 5, "product": ["Морква"], "quantity": 30}},
+    {
+        "model": "recipes.recipe",
+        "pk": 6,
+        "fields": {
+            "name": "Макарони з ковбасою",
+            "instructions": "Зваріть макарони в підсоленій воді за інструкцією на упаковці.\nНаріжте ковбасу соломкою й обсмажте 3–4 хвилини.\nЗмішайте макарони з ковбасою.\nПосипте тертим сиром і подавайте гарячими.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 18, "fields": {"recipe": 6, "product": ["Макарони"], "quantity": 200}},
+    {"model": "recipes.recipeingredient", "pk": 19, "fields": {"recipe": 6, "product": ["Ковбаса варена"], "quantity": 150}},
+    {"model": "recipes.recipeingredient", "pk": 20, "fields": {"recipe": 6, "product": ["Сир твердий"], "quantity": 30}},
+    {
+        "model": "recipes.recipe",
+        "pk": 7,
+        "fields": {
+            "name": "Вівсянка з бананом",
+            "instructions": "Доведіть молоко до кипіння.\nВсипте вівсянку й варіть на слабкому вогні 5–7 хвилин, помішуючи.\nНаріжте банан кружальцями й викладіть зверху.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 21, "fields": {"recipe": 7, "product": ["Вівсянка"], "quantity": 80}},
+    {"model": "recipes.recipeingredient", "pk": 22, "fields": {"recipe": 7, "product": ["Молоко 2.5%"], "quantity": 200}},
+    {"model": "recipes.recipeingredient", "pk": 23, "fields": {"recipe": 7, "product": ["Банан"], "quantity": 1}},
+    {
+        "model": "recipes.recipe",
+        "pk": 8,
+        "fields": {
+            "name": "Суп з квасолею",
+            "instructions": "Замочіть квасолю на ніч, потім варіть у свіжій воді 1 годину.\nНаріжте картоплю кубиками й додайте до квасолі.\nОбсмажте нарізані цибулю й моркву й додайте в суп.\nПосоліть і варіть ще 15–20 хвилин до готовності картоплі.",
+            "image": "",
+            "servings": 1,
+            "source_url": "",
+            "created_at": "2026-10-06T09:00:00Z"
+        }
+    },
+    {"model": "recipes.recipeingredient", "pk": 24, "fields": {"recipe": 8, "product": ["Квасоля суха"], "quantity": 100}},
+    {"model": "recipes.recipeingredient", "pk": 25, "fields": {"recipe": 8, "product": ["Морква"], "quantity": 100}},
+    {"model": "recipes.recipeingredient", "pk": 26, "fields": {"recipe": 8, "product": ["Цибуля"], "quantity": 100}},
+    {"model": "recipes.recipeingredient", "pk": 27, "fields": {"recipe": 8, "product": ["Картопля"], "quantity": 300}}
+]

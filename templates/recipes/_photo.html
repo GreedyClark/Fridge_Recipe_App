@@ -1,0 +1,8 @@
+{% if recipe.image %}
+    <img src="{{ recipe.image.url }}" alt="{{ recipe.name }}" class="photo {{ photo_class }}">
+{% else %}
+    <div class="photo-placeholder {{ photo_class }}">
+        <i class="ti ti-camera"></i>
+        <span>Фото страви</span>
+    </div>
+{% endif %}
