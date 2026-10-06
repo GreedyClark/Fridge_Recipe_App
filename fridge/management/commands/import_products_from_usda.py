@@ -1,18 +1,6 @@
-import requests
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from fridge.models import Product
-
-SEARCH_URL = "https://api.nal.usda.gov/fdc/v1/foods/search"
-FOOD_URL = "https://api.nal.usda.gov/fdc/v1/food/{}"
-TIMEOUT = 20
-SEARCH_UNSAFE_CHARS = '"/()'
-
-ENERGY_NUMBERS = ("208", "957", "958")
-PROTEIN_NUMBERS = ("203",)
-FAT_NUMBERS = ("204",)
-CARBS_NUMBERS = ("205", "205.2")
+from fridge.usda import USDAError, import_product, make_session
 
 PRODUCTS_TO_IMPORT = {
     "Куряче філе": {"query": "Chicken, broiler or fryers, breast, skinless, boneless, meat only, raw", "unit": "g"},
@@ -62,112 +50,40 @@ PRODUCTS_TO_IMPORT = {
 }
 
 
-def extract_nutrients(food):
-    nutrients = {}
-    for item in food.get("foodNutrients", []):
-        nested = item.get("nutrient") or {}
-        number = str(item.get("nutrientNumber") or nested.get("number") or "")
-        unit = (item.get("unitName") or nested.get("unitName") or "").upper()
-        value = item.get("value", item.get("amount"))
-        if number and value is not None and number not in nutrients:
-            nutrients[number] = (value, unit)
-    return nutrients
-
-
-def pick(nutrients, numbers, unit=None):
-    for number in numbers:
-        if number in nutrients:
-            value, value_unit = nutrients[number]
-            if unit is None or value_unit == unit:
-                return round(value, 1)
-    return None
-
-
-def clean_query(query):
-    for char in SEARCH_UNSAFE_CHARS:
-        query = query.replace(char, " ")
-    return " ".join(query.split())
-
-
-def choose_food(foods, query):
-    query = query.lower()
-    exact = [food for food in foods if food.get("description", "").lower() == query]
-    if exact:
-        return exact[0]
-    if "raw" in query:
-        raw = [food for food in foods if "raw" in food.get("description", "").lower()]
-        if raw:
-            return raw[0]
-    return foods[0]
 
 
 class Command(BaseCommand):
     help = "Імпортує калорійність і БЖУ продуктів з USDA FoodData Central"
 
     def handle(self, *args, **options):
-        if not settings.USDA_API_KEY:
-            raise CommandError("USDA_API_KEY не задано. Додайте ключ у файл .env.")
+        try:
+            session = make_session()
+        except USDAError as exc:
+            raise CommandError(str(exc)) from exc
 
-        session = requests.Session()
-        session.headers["X-Api-Key"] = settings.USDA_API_KEY
         created = updated = skipped = 0
-
         for name, params in PRODUCTS_TO_IMPORT.items():
             try:
-                food = self.fetch_food(session, params)
-            except requests.RequestException as exc:
-                self.stdout.write(self.style.WARNING(f"⚠️ {name}: помилка запиту ({exc})"))
+                product, is_new, food = import_product(
+                    name,
+                    params["query"],
+                    params["unit"],
+                    grams_per_piece=params.get("grams_per_piece"),
+                    fdc_id=params.get("fdc_id"),
+                    session=session,
+                )
+            except USDAError as exc:
+                self.stdout.write(self.style.WARNING(f"⚠️ {name}: {exc}"))
                 skipped += 1
                 continue
 
-            if food is None:
-                self.stdout.write(self.style.WARNING(f'⚠️ {name}: нічого не знайдено за запитом "{params["query"]}"'))
-                skipped += 1
-                continue
-
-            nutrients = extract_nutrients(food)
-            calories = pick(nutrients, ENERGY_NUMBERS, unit="KCAL")
-            if calories is None:
-                self.stdout.write(self.style.WARNING(f'⚠️ {name}: у записі "{food.get("description")}" немає енергії в ккал'))
-                skipped += 1
-                continue
-
-            _, is_new = Product.objects.update_or_create(
-                name=name,
-                defaults={
-                    "default_unit": params["unit"],
-                    "calories_per_100": calories,
-                    "protein_per_100": pick(nutrients, PROTEIN_NUMBERS),
-                    "fat_per_100": pick(nutrients, FAT_NUMBERS),
-                    "carbs_per_100": pick(nutrients, CARBS_NUMBERS),
-                    "grams_per_piece": params.get("grams_per_piece"),
-                    "usda_fdc_id": food.get("fdcId"),
-                },
-            )
             if is_new:
                 created += 1
             else:
                 updated += 1
-
             self.stdout.write(self.style.SUCCESS(
-                f'✅ {name} → {calories:g} ккал/100г (FDC ID: {food.get("fdcId")}, матч: "{food.get("description")}")'
+                f'✅ {name} → {product.calories_per_100:g} ккал/100г '
+                f'(FDC ID: {food.get("fdcId")}, матч: "{food.get("description")}")'
             ))
 
         self.stdout.write(f"\nСтворено: {created}, оновлено: {updated}, пропущено: {skipped}")
-
-    def fetch_food(self, session, params):
-        if params.get("fdc_id"):
-            response = session.get(FOOD_URL.format(params["fdc_id"]), timeout=TIMEOUT)
-            response.raise_for_status()
-            return response.json()
-
-        response = session.get(
-            SEARCH_URL,
-            params={"query": clean_query(params["query"]), "dataType": "Foundation,SR Legacy", "pageSize": 5},
-            timeout=TIMEOUT,
-        )
-        response.raise_for_status()
-        foods = response.json().get("foods", [])
-        if not foods:
-            return None
-        return choose_food(foods, params["query"])
