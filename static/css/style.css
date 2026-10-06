@@ -820,3 +820,116 @@ h1, h2, h3, .display-num {
 .recipe-card-photo-sm {
     height: 110px;
 }
+.today-card {
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+    border-radius: 20px;
+    padding: 1.75rem;
+    display: flex;
+    flex-direction: column;
+    gap: .5rem;
+}
+
+.today-label {
+    font-size: .75rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: #2A2F10;
+}
+
+.today-value {
+    font-family: var(--fr-display);
+    font-weight: 700;
+    font-size: clamp(4rem, 9vw, 6rem);
+    line-height: .95;
+}
+
+.week-total {
+    font-size: 2.5rem;
+    line-height: 1;
+    margin-top: .375rem;
+}
+
+.week-total small {
+    font-family: "Onest", sans-serif;
+    font-size: 1rem;
+}
+
+.week-chart {
+    display: flex;
+    align-items: stretch;
+    gap: .625rem;
+    height: 210px;
+}
+
+.week-bar {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: .375rem;
+    min-width: 0;
+}
+
+.week-bar-value {
+    font-size: .75rem;
+    font-weight: 700;
+    color: var(--fr-muted);
+    min-height: 1.1em;
+}
+
+.week-bar-track {
+    flex-grow: 1;
+    width: 100%;
+    max-width: 44px;
+    display: flex;
+    align-items: flex-end;
+}
+
+.week-bar-fill {
+    width: 100%;
+    min-height: 4px;
+    background: var(--fr-line);
+    border-radius: 10px;
+}
+
+.week-bar-label {
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--fr-muted);
+}
+
+.week-bar.is-today .week-bar-fill {
+    background: var(--fr-accent);
+}
+
+.week-bar.is-today .week-bar-value,
+.week-bar.is-today .week-bar-label {
+    color: var(--fr-text);
+    font-weight: 800;
+}
+
+.log-row {
+    display: flex;
+    align-items: center;
+    gap: .875rem;
+    padding: .75rem 0;
+    border-top: 1px solid var(--fr-line);
+}
+
+.log-thumb {
+    width: 52px;
+    height: 52px;
+    flex-shrink: 0;
+    border-radius: 14px;
+    gap: 0;
+}
+
+.log-thumb span {
+    display: none;
+}
+
+.log-thumb i {
+    font-size: 1.25rem;
+}

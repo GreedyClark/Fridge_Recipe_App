@@ -1,9 +1,14 @@
+from datetime import timedelta
+
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db import transaction
+from django.db.models import Count, Sum
+from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect
+from django.utils import timezone
 from django.views import View
-from django.views.generic import DetailView, TemplateView
+from django.views.generic import DetailView, ListView, TemplateView
 
 from fridge.models import FridgeItem
 
@@ -20,6 +25,8 @@ from .services import (
 )
 
 LIGHT_CALORIES = 500
+LOG_LIMIT = 50
+WEEKDAYS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Нд"]
 
 FILTERS = [
     ("all", "Усі"),
@@ -120,3 +127,54 @@ class CookRecipeView(LoginRequiredMixin, View):
         written_off = ", ".join(str(ingredient) for ingredient in recipe.ingredients.all())
         messages.success(request, f"Записано! З холодильника списано: {written_off}")
         return redirect("recipes:log")
+
+
+class CookingLogListView(LoginRequiredMixin, ListView):
+    template_name = "recipes/cooking_log.html"
+    context_object_name = "logs"
+
+    def get_queryset(self):
+        logs = list(CookingLog.objects.filter(user=self.request.user).select_related("recipe")[:LOG_LIMIT])
+        for log in logs:
+            log.local_date = timezone.localdate(log.cooked_at)
+        return logs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.localdate()
+        week_start = today - timedelta(days=6)
+
+        rows = (
+            CookingLog.objects.filter(user=self.request.user, cooked_at__date__gte=week_start)
+            .annotate(day=TruncDate("cooked_at"))
+            .values("day")
+            .annotate(total=Sum("calories_consumed"), dishes=Count("id"))
+        )
+        by_day = {row["day"]: row for row in rows}
+
+        days = []
+        for offset in range(7):
+            day = week_start + timedelta(days=offset)
+            row = by_day.get(day, {})
+            days.append({
+                "date": day,
+                "label": WEEKDAYS[day.weekday()],
+                "total": round(row.get("total") or 0),
+                "is_today": day == today,
+            })
+
+        peak = max(day["total"] for day in days)
+        for day in days:
+            day["height"] = round(day["total"] / peak * 100) if peak else 0
+
+        week_total = sum(day["total"] for day in days)
+        context.update({
+            "today": today,
+            "yesterday": today - timedelta(days=1),
+            "today_total": days[-1]["total"],
+            "today_dishes": by_day.get(today, {}).get("dishes", 0),
+            "week_days": days,
+            "week_total": week_total,
+            "week_average": round(week_total / 7),
+        })
+        return context

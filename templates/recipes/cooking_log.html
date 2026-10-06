@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% load recipe_extras %}
+
+{% block title %}Журнал · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="page-label">Історія приготувань</div>
+    <h1 class="page-title">Журнал</h1>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="today-card h-100">
+            <div class="today-label">Сьогодні</div>
+            <div class="today-value">{{ today_total|floatformat:"0g" }}</div>
+            <div class="fw-bold fs-5">ккал · {{ today_dishes }} {{ today_dishes|uk_plural:"страва,страви,страв" }}</div>
+        </div>
+    </div>
+    <div class="col-lg-8">
+        <div class="card h-100">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+                <div class="d-flex flex-wrap justify-content-between align-items-end gap-2">
+                    <div>
+                        <div class="page-label">За останні 7 днів</div>
+                        <div class="display-num week-total">{{ week_total|floatformat:"0g" }} <small class="text-secondary">ккал</small></div>
+                    </div>
+                    <div class="text-secondary fw-semibold">у середньому {{ week_average|floatformat:"0g" }} ккал на день</div>
+                </div>
+                <div class="week-chart" role="img" aria-label="Калорії за останні 7 днів">
+                    {% for day in week_days %}
+                        <div class="week-bar{% if day.is_today %} is-today{% endif %}">
+                            <span class="week-bar-value">{% if day.total %}{{ day.total }}{% endif %}</span>
+                            <div class="week-bar-track">
+                                <div class="week-bar-fill" style="height: {{ day.height }}%"></div>
+                            </div>
+                            <span class="week-bar-label">{{ day.label }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-4">
+        <h2 class="h4 mb-3">Записи</h2>
+        {% if logs %}
+            {% regroup logs by local_date as log_days %}
+            <div class="d-flex flex-column gap-4">
+                {% for group in log_days %}
+                    <div>
+                        <div class="page-label mb-2">
+                            {% if group.grouper == today %}Сьогодні, {% elif group.grouper == yesterday %}Вчора, {% endif %}{{ group.grouper|date:"j E" }}
+                        </div>
+                        {% for log in group.list %}
+                            <div class="log-row">
+                                {% if log.recipe %}
+                                    {% include "recipes/_photo.html" with recipe=log.recipe photo_class="log-thumb" %}
+                                {% else %}
+                                    <div class="photo-placeholder log-thumb"><i class="ti ti-camera"></i></div>
+                                {% endif %}
+                                <div class="flex-grow-1 min-w-0">
+                                    {% if log.recipe %}
+                                        <a href="{% url 'recipes:detail' log.recipe.pk %}" class="fw-bold text-body text-decoration-none">{{ log.recipe.name }}</a>
+                                    {% else %}
+                                        <span class="fw-bold">Видалений рецепт</span>
+                                    {% endif %}
+                                    <div class="text-secondary small">{{ log.cooked_at|time:"H:i" }}</div>
+                                </div>
+                                <div class="fw-bold text-nowrap">{{ log.calories_consumed|floatformat:"0g" }} <span class="text-secondary fw-semibold">ккал</span></div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state py-4">
+                <span class="empty-icon"><i class="ti ti-chef-hat"></i></span>
+                <h3 class="h4 mb-0">Тут поки порожньо</h3>
+                <p class="text-secondary mb-0">Приготуй щось за рецептом і натисни «Приготував це» — запис з'явиться тут.</p>
+                <a href="{% url 'recipes:what_can_i_cook' %}" class="btn btn-primary">Що приготувати?</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
