@@ -1,9 +1,11 @@
 <div class="import-item{% if form.warning or form.errors %} has-warning{% endif %}" data-ingredient>
     {% for field in form.hidden_fields %}{{ field }}{% endfor %}
-    <div class="import-item-head">
-        <span class="text-secondary small">{% if form.original.value %}З сайту: «{{ form.original.value }}»{% else %}Новий рядок{% endif %}</span>
-        {% if form.warning and not form.errors %}<span class="warn-text"><i class="ti ti-alert-triangle"></i>{{ form.warning }}</span>{% endif %}
-    </div>
+    {% if form.original.value or form.warning or not editing %}
+        <div class="import-item-head">
+            <span class="text-secondary small">{% if form.original.value %}З сайту: «{{ form.original.value }}»{% else %}Новий рядок{% endif %}</span>
+            {% if form.warning and not form.errors %}<span class="warn-text"><i class="ti ti-alert-triangle"></i>{{ form.warning }}</span>{% endif %}
+        </div>
+    {% endif %}
     <div class="import-fields">
         <div class="import-product min-w-0">
             <label for="{{ form.product.id_for_label }}" class="visually-hidden">Продукт</label>

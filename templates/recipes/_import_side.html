@@ -1,0 +1,22 @@
+<div class="card overflow-hidden">
+    {% if image_url %}
+        <img src="{{ image_url }}" alt="Фото страви" class="photo import-photo" referrerpolicy="no-referrer"
+             onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+        <div class="photo-placeholder import-photo d-none"><i class="ti ti-camera"></i><span>Фото недоступне</span></div>
+        <div class="photo-credit">Фото: {{ source_domain }}</div>
+    {% else %}
+        <div class="photo-placeholder import-photo"><i class="ti ti-camera"></i><span>На сторінці немає фото</span></div>
+    {% endif %}
+    <div class="card-body p-4 d-flex flex-column gap-3">
+        <a href="{{ source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ source_domain }}</a>
+        <div class="d-flex gap-2 text-secondary small">
+            <i class="ti ti-lock text-accent"></i>
+            <span>Рецепт бачиш лише ти. Фото не копіюємо, а показуємо з сайту-джерела.</span>
+        </div>
+        <div>
+            <label for="{{ recipe_form.image.id_for_label }}" class="form-label">Своє фото <span class="text-secondary fw-normal">(необов'язково)</span></label>
+            {{ recipe_form.image }}
+            {% if recipe_form.image.errors %}<div class="field-error">{{ recipe_form.image.errors|join:" " }}</div>{% endif %}
+        </div>
+    </div>
+</div>

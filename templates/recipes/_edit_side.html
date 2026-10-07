@@ -1,0 +1,16 @@
+<div class="card overflow-hidden">
+    {% include "recipes/_photo.html" with photo_class="import-photo" %}
+    {% if not recipe.image and recipe.image_url %}
+        <div class="photo-credit">Фото: {{ recipe.source_domain }}</div>
+    {% endif %}
+    <div class="card-body p-4 d-flex flex-column gap-3">
+        {% if recipe.source_url %}
+            <a href="{{ recipe.source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ recipe.source_domain }}</a>
+        {% endif %}
+        <div>
+            <label for="{{ recipe_form.image.id_for_label }}" class="form-label">{% if recipe.image %}Замінити фото{% else %}Своє фото{% endif %} <span class="text-secondary fw-normal">(необов'язково)</span></label>
+            {{ recipe_form.image }}
+            {% if recipe_form.image.errors %}<div class="field-error">{{ recipe_form.image.errors|join:" " }}</div>{% endif %}
+        </div>
+    </div>
+</div>

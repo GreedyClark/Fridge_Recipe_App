@@ -1,0 +1,63 @@
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    const units = JSON.parse(document.getElementById("product-units").textContent);
+    const list = document.getElementById("ingredient-list");
+    const totalForms = document.getElementById("id_ingredients-TOTAL_FORMS");
+
+    function setupIngredient(row) {
+        const select = row.querySelector(".js-product");
+        const unitBadge = row.querySelector("[data-unit]");
+        const newProduct = row.querySelector("[data-new-product]");
+
+        select.addEventListener("change", () => {
+            if (select.value) {
+                unitBadge.textContent = units[select.value] || "—";
+                if (newProduct) {
+                    newProduct.classList.add("d-none");
+                }
+            }
+        });
+
+        if (window.TomSelect) {
+            new TomSelect(select, {
+                maxOptions: null,
+                allowEmptyOption: false,
+                placeholder: newProduct ? "Або обери зі списку" : "Почни вводити назву",
+                render: {
+                    no_results: () => '<div class="no-results">Нічого не знайдено</div>',
+                },
+            });
+        }
+
+        row.querySelector("[data-remove]").addEventListener("click", () => {
+            row.querySelector("input[name$='-DELETE']").checked = true;
+            row.classList.add("d-none");
+        });
+    }
+
+    list.querySelectorAll("[data-ingredient]").forEach(setupIngredient);
+
+    document.getElementById("add-ingredient").addEventListener("click", () => {
+        const index = Number(totalForms.value);
+        const html = document.getElementById("empty-ingredient").innerHTML.replaceAll("__prefix__", index);
+        list.insertAdjacentHTML("beforeend", html);
+        totalForms.value = index + 1;
+        setupIngredient(list.lastElementChild);
+    });
+
+    document.getElementById("add-step").addEventListener("click", () => {
+        const steps = document.getElementById("step-list");
+        const number = steps.querySelectorAll("[data-step]").length + 1;
+        steps.insertAdjacentHTML("beforeend",
+            `<div class="import-step" data-step><span class="how-num muted">${number}</span>` +
+            `<label class="visually-hidden" for="step-${number}">Крок ${number}</label>` +
+            `<textarea id="step-${number}" name="steps" rows="2" class="form-control"></textarea></div>`);
+        steps.lastElementChild.querySelector("textarea").focus();
+    });
+
+    document.getElementById("recipe-editor").addEventListener("submit", () => {
+        const button = document.getElementById("save-recipe");
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Зберігаю…';
+    });
+</script>

@@ -1,0 +1,76 @@
+{% if has_errors %}
+    <div class="import-banner mb-4">
+        <i class="ti ti-alert-triangle"></i>
+        <span class="fw-bold">Виправ позначені поля</span>
+        {% for error in recipe_form.non_field_errors %}<span class="text-secondary">{{ error }}</span>{% endfor %}
+        {% for error in formset.non_form_errors %}<span class="text-secondary">{{ error }}</span>{% endfor %}
+    </div>
+{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate id="recipe-editor">
+    {% csrf_token %}
+    {{ formset.management_form }}
+    <div class="row g-4 align-items-start">
+        <div class="col-lg-8 d-flex flex-column gap-4">
+            <div class="card">
+                <div class="card-body p-4">
+                    <div class="row g-3">
+                        <div class="col-sm-9">
+                            <label for="{{ recipe_form.name.id_for_label }}" class="form-label">{{ recipe_form.name.label }}</label>
+                            {{ recipe_form.name }}
+                            {% if recipe_form.name.errors %}<div class="field-error">{{ recipe_form.name.errors|join:" " }}</div>{% endif %}
+                        </div>
+                        <div class="col-sm-3">
+                            <label for="{{ recipe_form.servings.id_for_label }}" class="form-label">{{ recipe_form.servings.label }}</label>
+                            {{ recipe_form.servings }}
+                            {% if recipe_form.servings.errors %}<div class="field-error">{{ recipe_form.servings.errors|join:" " }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-4 d-flex flex-column gap-3">
+                    <h2 class="h3 mb-0">Інгредієнти</h2>
+                    <div class="d-flex flex-column gap-3" id="ingredient-list">
+                        {% for form in formset %}
+                            {% include "recipes/_import_ingredient.html" %}
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-ghost align-self-start" id="add-ingredient"><i class="ti ti-plus"></i>Додати інгредієнт</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-body p-4 d-flex flex-column gap-3">
+                    <h2 class="h3 mb-0">Кроки</h2>
+                    <div class="d-flex flex-column gap-3" id="step-list">
+                        {% for step in steps %}
+                            <div class="import-step" data-step>
+                                <span class="how-num muted">{{ forloop.counter }}</span>
+                                <label class="visually-hidden" for="step-{{ forloop.counter }}">Крок {{ forloop.counter }}</label>
+                                <textarea id="step-{{ forloop.counter }}" name="steps" rows="2" class="form-control">{{ step }}</textarea>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <button type="button" class="btn btn-ghost align-self-start" id="add-step"><i class="ti ti-plus"></i>Додати крок</button>
+                </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button type="submit" class="btn btn-primary" id="save-recipe"><i class="ti ti-check"></i>{{ submit_label }}</button>
+                <a href="{{ cancel_url }}" class="btn btn-ghost">Скасувати</a>
+            </div>
+        </div>
+
+        <div class="col-lg-4 order-first order-lg-last">
+            {% include side_template %}
+        </div>
+    </div>
+</form>
+
+<template id="empty-ingredient">
+    {% with form=formset.empty_form %}{% include "recipes/_import_ingredient.html" %}{% endwith %}
+</template>
+
+{{ product_units|json_script:"product-units" }}

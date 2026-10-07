@@ -120,3 +120,67 @@ class MyRecipesTests(RecipeTestMixin, TestCase):
         for recipe in (shared, foreign):
             self.assertEqual(self.client.post(reverse("recipes:delete", args=[recipe.pk])).status_code, 404)
         self.assertEqual(Recipe.objects.count(), 2)
+
+
+
+class RecipeEditTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.recipe = self.make_recipe(owner=self.owner)
+        self.url = reverse("recipes:edit", args=[self.recipe.pk])
+        self.milk = Product.objects.create(name="Молоко", default_unit="ml", calories_per_100=52)
+
+    def form_data(self, **changes):
+        data = {
+            "name": "Яєчня з молоком",
+            "servings": "2",
+            "steps": ["Збити яйця з молоком.", "Посмажити."],
+            "ingredients-TOTAL_FORMS": "3",
+            "ingredients-INITIAL_FORMS": "2",
+            "ingredients-MIN_NUM_FORMS": "0",
+            "ingredients-MAX_NUM_FORMS": "1000",
+            "ingredients-0-product": str(self.eggs.pk),
+            "ingredients-0-quantity": "3",
+            "ingredients-1-product": str(self.salt.pk),
+            "ingredients-1-optional": "on",
+            "ingredients-1-DELETE": "on",
+            "ingredients-2-product": str(self.milk.pk),
+            "ingredients-2-quantity": "50",
+        }
+        data.update(changes)
+        return data
+
+    def test_edit_page_shows_current_recipe(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'value="Яєчня"')
+        self.assertContains(response, "Посмажити.")
+        self.assertContains(response, "Зберегти зміни")
+
+    def test_owner_saves_changes(self):
+        self.client.force_login(self.owner)
+
+        response = self.client.post(self.url, self.form_data())
+
+        self.assertRedirects(response, reverse("recipes:detail", args=[self.recipe.pk]))
+        self.recipe.refresh_from_db()
+        self.assertEqual(self.recipe.name, "Яєчня з молоком")
+        self.assertEqual(self.recipe.servings, 2)
+        self.assertEqual(self.recipe.steps, ["Збити яйця з молоком.", "Посмажити."])
+        quantities = {item.product.name: item.quantity for item in self.recipe.ingredients.all()}
+        self.assertEqual(quantities, {"Яйце": 3, "Молоко": 50})
+
+    def test_invalid_form_keeps_recipe(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(self.url, self.form_data(**{"ingredients-0-quantity": ""}))
+        self.assertContains(response, "Вкажи кількість")
+        self.recipe.refresh_from_db()
+        self.assertEqual(self.recipe.name, "Яєчня")
+        self.assertEqual(self.recipe.ingredients.count(), 2)
+
+    def test_only_owner_can_edit(self):
+        shared = self.make_recipe(name="Спільна")
+        self.client.force_login(self.stranger)
+        self.assertEqual(self.client.get(self.url).status_code, 404)
+        self.assertEqual(self.client.post(self.url, self.form_data()).status_code, 404)
+        self.assertEqual(self.client.get(reverse("recipes:edit", args=[shared.pk])).status_code, 404)

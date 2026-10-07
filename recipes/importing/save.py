@@ -59,3 +59,22 @@ def save_import(record, recipe_data, rows, steps):
         record.recipe = recipe
         record.save(update_fields=["status", "recipe"])
     return recipe
+
+
+def update_recipe(recipe, recipe_data, rows, steps):
+    products = resolve_products(rows)
+
+    with transaction.atomic():
+        recipe.name = recipe_data["name"]
+        recipe.servings = recipe_data["servings"]
+        recipe.instructions = "\n".join(steps)
+        if recipe_data.get("image"):
+            recipe.image = recipe_data["image"]
+        recipe.save()
+
+        recipe.ingredients.all().delete()
+        RecipeIngredient.objects.bulk_create([
+            RecipeIngredient(recipe=recipe, product=product, quantity=row["quantity"], optional=row["optional"])
+            for product, row in zip(products, rows)
+        ])
+    return recipe

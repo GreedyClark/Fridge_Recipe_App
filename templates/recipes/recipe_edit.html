@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Редагувати · {{ recipe.name }} · Fridge Recipe{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<a href="{% url 'recipes:detail' recipe.pk %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>До рецепта</a>
+
+<div class="mb-4">
+    <div class="page-label">Мій рецепт</div>
+    <h1 class="page-title">Редагувати рецепт</h1>
+</div>
+
+{% include "recipes/_recipe_editor.html" %}
+{% endblock %}
+
+{% block scripts %}
+{% include "recipes/_recipe_editor_js.html" %}
+{% endblock %}

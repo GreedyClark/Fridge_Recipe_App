@@ -63,7 +63,7 @@
         <a href="{% url 'fridge:list' %}" class="{% if view == 'fridge:list' or view == 'fridge:add' or view == 'fridge:edit' or view == 'fridge:delete' %}active{% endif %}">
             <span class="tabbar-icon"><i class="ti ti-fridge"></i></span>Холодильник
         </a>
-        <a href="{% url 'recipes:list' %}" class="{% if view == 'recipes:list' or view == 'recipes:detail' or view == 'recipes:import' or view == 'recipes:import_review' %}active{% endif %}">
+        <a href="{% url 'recipes:list' %}" class="{% if view == 'recipes:list' or view == 'recipes:detail' or view == 'recipes:import' or view == 'recipes:import_review' or view == 'recipes:edit' or view == 'recipes:delete' %}active{% endif %}">
             <span class="tabbar-icon"><i class="ti ti-book"></i></span>Рецепти
         </a>
         <a href="{% url 'recipes:what_can_i_cook' %}" class="{% if view == 'recipes:what_can_i_cook' %}active{% endif %}">
