@@ -9,8 +9,9 @@ from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import DetailView, FormView, ListView, TemplateView
+from django.views.generic import DeleteView, DetailView, FormView, ListView, TemplateView
 
 from fridge.models import FridgeItem, Product
 
@@ -40,10 +41,13 @@ FILTERS = [
     ("ready", "Можна приготувати"),
     ("almost", "Майже"),
     ("light", "До 500 ккал"),
+    ("mine", "Мої"),
 ]
 
 
-def passes_filter(match, key):
+def passes_filter(match, key, user):
+    if key == "mine":
+        return match.recipe.owner_id == user.pk
     if key == "ready":
         return match.status == READY
     if key == "almost":
@@ -76,12 +80,12 @@ class RecipeListView(LoginRequiredMixin, TemplateView):
             {
                 "key": key,
                 "label": label,
-                "count": sum(1 for match in matches if passes_filter(match, key)),
+                "count": sum(1 for match in matches if passes_filter(match, key, self.request.user)),
                 "active": key == active,
             }
             for key, label in FILTERS
         ]
-        context["matches"] = [match for match in matches if passes_filter(match, active)]
+        context["matches"] = [match for match in matches if passes_filter(match, active, self.request.user)]
         context["query"] = query
         context["active_filter"] = active
         return context
@@ -114,6 +118,17 @@ class RecipeDetailView(LoginRequiredMixin, DetailView):
         context["match"] = match_recipe(self.object, fridge_stock(self.request.user))
         return context
 
+
+class RecipeDeleteView(LoginRequiredMixin, DeleteView):
+    template_name = "recipes/recipe_confirm_delete.html"
+    success_url = reverse_lazy("recipes:list")
+
+    def get_queryset(self):
+        return Recipe.objects.filter(owner=self.request.user)
+
+    def form_valid(self, form):
+        messages.success(self.request, f"Рецепт «{self.object.name}» видалено.")
+        return super().form_valid(form)
 
 class CookRecipeView(LoginRequiredMixin, View):
     def post(self, request, pk):

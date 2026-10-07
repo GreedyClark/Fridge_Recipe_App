@@ -1120,3 +1120,46 @@ h1, h2, h3, .display-num {
         order: 3;
     }
 }
+
+.mine-badge {
+    position: absolute;
+    top: .75rem;
+    left: .75rem;
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+    border-radius: 999px;
+    padding: .2rem .65rem;
+    font-size: .75rem;
+    font-weight: 800;
+}
+
+.mine-badge.static {
+    position: static;
+}
+
+a.photo-credit {
+    display: block;
+    border-bottom: none;
+    text-decoration: none;
+}
+
+a.photo-credit:hover {
+    color: var(--fr-text);
+}
+
+.ingredient-group {
+    padding: .75rem 1.5rem .25rem;
+    border-top: 1px solid var(--fr-line);
+    color: var(--fr-muted);
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.ingredient-row.optional {
+    border-top: none;
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+    color: var(--fr-muted);
+}

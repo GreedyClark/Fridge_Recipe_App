@@ -8,11 +8,20 @@
 
 <div class="row g-4 align-items-start">
     <div class="col-lg-8 d-flex flex-column gap-4">
-        <div class="card">
+        <div class="card overflow-hidden">
             {% include "recipes/_photo.html" with photo_class="recipe-hero" %}
+            {% if not recipe.image and recipe.image_url %}
+                <a href="{{ recipe.source_url }}" target="_blank" rel="noopener" class="photo-credit">Фото: {{ recipe.source_domain }}</a>
+            {% endif %}
         </div>
 
         <div>
+            {% if recipe.owner_id == user.pk %}
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <span class="mine-badge static">Мій рецепт</span>
+                    <a href="{% url 'recipes:delete' recipe.pk %}" class="btn btn-ghost btn-sm ms-auto"><i class="ti ti-trash"></i>Видалити</a>
+                </div>
+            {% endif %}
             <h1 class="page-title">{{ recipe.name }}</h1>
             {% with ingredients_count=match.ingredients|length %}
                 <p class="text-secondary mt-2 mb-0">
@@ -35,15 +44,13 @@
                 <h2 class="h4 mb-0">Інгредієнти</h2>
                 <span class="text-secondary small fw-semibold">потрібно · у холодильнику</span>
             </div>
-            {% for item in match.ingredients %}
+            {% for item in match.required %}
                 {% with unit=item.product.get_default_unit_display %}
                     <div class="ingredient-row">
                         <span class="flex-grow-1 fw-semibold">{{ item.product.name }}</span>
                         <span class="fw-bold text-nowrap">{% if item.needed is None %}—{% else %}{{ item.needed|floatformat:"-2" }} {{ unit }}{% endif %}</span>
                         <span class="ingredient-have">
-                            {% if item.optional %}
-                                <span class="text-secondary">за смаком</span>
-                            {% elif item.status == "ready" %}
+                            {% if item.status == "ready" %}
                                 <span class="text-accent"><i class="ti ti-check"></i> є {{ item.available|floatformat:"-2" }} {{ unit }}</span>
                             {% elif item.status == "almost" %}
                                 <span class="text-warn">бракує {{ item.shortage|floatformat:"-2" }} {{ unit }}</span>
@@ -54,6 +61,15 @@
                     </div>
                 {% endwith %}
             {% endfor %}
+            {% if match.to_taste %}
+                <div class="ingredient-group">За смаком</div>
+                {% for item in match.to_taste %}
+                    <div class="ingredient-row optional">
+                        <span class="flex-grow-1">{{ item.product.name }}</span>
+                        {% if item.needed is not None %}<span class="text-secondary text-nowrap">{{ item.needed|floatformat:"-2" }} {{ item.product.get_default_unit_display }}</span>{% endif %}
+                    </div>
+                {% endfor %}
+            {% endif %}
         </div>
 
         <div class="card">

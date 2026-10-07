@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+
+{% block title %}Видалити рецепт · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-body p-4 p-md-5 d-flex flex-column gap-3">
+                <span class="empty-icon text-danger"><i class="ti ti-trash"></i></span>
+                <h1 class="h2 mb-0">Видалити рецепт?</h1>
+                <p class="text-secondary mb-0">
+                    Рецепт <strong class="text-body">«{{ recipe.name }}»</strong> зникне з твоєї книги.
+                    Записи в журналі залишаться з позначкою «Видалений рецепт».
+                </p>
+                <form method="post" class="d-flex flex-wrap gap-2 mt-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger"><i class="ti ti-trash"></i>Видалити</button>
+                    <a href="{% url 'recipes:detail' recipe.pk %}" class="btn btn-ghost">Скасувати</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

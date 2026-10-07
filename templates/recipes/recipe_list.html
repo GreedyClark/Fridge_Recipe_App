@@ -32,6 +32,7 @@
             <div class="col">
                 <a href="{% url 'recipes:detail' match.recipe.pk %}" class="card recipe-card h-100">
                     {% include "recipes/_photo.html" with recipe=match.recipe photo_class="recipe-card-photo" %}
+                    {% if match.recipe.owner_id %}<span class="mine-badge">Мій</span>{% endif %}
                     <div class="card-body d-flex flex-column gap-2">
                         <h2 class="recipe-card-title">{{ match.recipe.name }}</h2>
                         <span class="kcal"><i class="ti ti-flame"></i>≈ {{ match.nutrition.calories }} ккал</span>
@@ -40,6 +41,15 @@
                 </a>
             </div>
         {% endfor %}
+    </div>
+{% elif active_filter == "mine" and not query %}
+    <div class="card">
+        <div class="card-body empty-state">
+            <span class="empty-icon"><i class="ti ti-download"></i></span>
+            <h2 class="h3 mb-0">Своїх рецептів поки немає</h2>
+            <p class="text-secondary mb-0">Встав посилання на рецепт з будь-якого сайту, і він з'явиться тут.</p>
+            <a href="{% url 'recipes:import' %}" class="btn btn-primary"><i class="ti ti-download"></i>Імпортувати рецепт</a>
+        </div>
     </div>
 {% else %}
     <div class="card">

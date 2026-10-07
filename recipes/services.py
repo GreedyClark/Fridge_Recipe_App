@@ -48,6 +48,10 @@ class RecipeMatch:
         return [ingredient for ingredient in self.ingredients if not ingredient.optional]
 
     @property
+    def to_taste(self):
+        return [ingredient for ingredient in self.ingredients if ingredient.optional]
+
+    @property
     def status(self):
         statuses = {ingredient.status for ingredient in self.required}
         if MISSING in statuses:

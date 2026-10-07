@@ -1,5 +1,12 @@
 {% if recipe.image %}
     <img src="{{ recipe.image.url }}" alt="{{ recipe.name }}" class="photo {{ photo_class }}">
+{% elif recipe.image_url %}
+    <img src="{{ recipe.image_url }}" alt="{{ recipe.name }}" class="photo {{ photo_class }}" loading="lazy" referrerpolicy="no-referrer"
+         onerror="this.classList.add('d-none'); this.nextElementSibling.classList.remove('d-none');">
+    <div class="photo-placeholder {{ photo_class }} d-none">
+        <i class="ti ti-camera"></i>
+        <span>Фото страви</span>
+    </div>
 {% else %}
     <div class="photo-placeholder {{ photo_class }}">
         <i class="ti ti-camera"></i>
