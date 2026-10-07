@@ -1,8 +1,11 @@
-from unittest.mock import Mock
+from io import StringIO
+from unittest.mock import Mock, patch
 
 import requests
-from django.test import TestCase, override_settings
+from django.core.management import call_command
+from django.test import SimpleTestCase, TestCase, override_settings
 
+from .catalog import PRODUCTS
 from .models import Product
 from .usda import ENERGY_NUMBERS, USDAError, choose_food, clean_query, extract_nutrients, import_product, pick
 
@@ -64,6 +67,10 @@ class ChooseFoodTests(TestCase):
         foods = [{"description": "Bologna, pork"}, {"description": "Bologna, turkey"}]
         self.assertEqual(choose_food(foods, "Bologna, beef")["description"], "Bologna, pork")
 
+    def test_prefers_most_matching_words(self):
+        foods = [{"description": "Orange peel, raw"}, {"description": "Orange juice, raw"}]
+        self.assertEqual(choose_food(foods, "Orange juice, chilled, raw")["description"], "Orange juice, raw")
+
     def test_clean_query_removes_unsafe_chars(self):
         self.assertEqual(clean_query('Beef, 80% lean / 20% fat (raw) 0"'), "Beef, 80% lean 20% fat raw 0")
 
@@ -91,6 +98,16 @@ class ImportProductTests(TestCase):
         self.assertFalse(created)
         self.assertEqual(Product.objects.get(name="Банан").calories_per_100, 89.0)
 
+    def test_skips_foods_without_energy(self):
+        no_energy = {"fdcId": 1, "description": "Bananas, raw", "foodNutrients": []}
+        session = Mock()
+        session.get.return_value = fake_response({"foods": [no_energy, SEARCH_FOOD]})
+
+        product, created, food = import_product("Банан", "Bananas, raw", "pcs", grams_per_piece=120, session=session)
+
+        self.assertEqual(food["fdcId"], SEARCH_FOOD["fdcId"])
+        self.assertEqual(product.calories_per_100, 89)
+
     def test_not_found_raises(self):
         session = Mock()
         session.get.return_value = fake_response({"foods": []})
@@ -108,3 +125,49 @@ class ImportProductTests(TestCase):
     def test_missing_key_raises(self):
         with self.assertRaises(USDAError):
             import_product("Банан", "Bananas, raw", "pcs")
+
+
+class CatalogTests(SimpleTestCase):
+    def test_entries_are_valid(self):
+        units = {"g", "ml", "pcs"}
+        for name, params in PRODUCTS.items():
+            with self.subTest(name=name):
+                self.assertTrue(params["query"])
+                self.assertIn(params["unit"], units)
+                if params["unit"] == "pcs":
+                    self.assertGreater(params.get("grams_per_piece", 0), 0)
+
+    def test_catalog_is_big_enough(self):
+        self.assertGreaterEqual(len(PRODUCTS), 150)
+
+
+@override_settings(USDA_API_KEY="key")
+class ImportCommandTests(TestCase):
+    def fake_import(self, name, query, unit, grams_per_piece=None, fdc_id=None, session=None):
+        if name == "Сіль":
+            raise USDAError("нічого не знайдено")
+        product, created = Product.objects.update_or_create(
+            name=name, defaults={"default_unit": unit, "calories_per_100": 100, "grams_per_piece": grams_per_piece}
+        )
+        return product, created, {"fdcId": 1, "description": query}
+
+    @patch("fridge.management.commands.import_products_from_usda.import_product")
+    def test_imports_catalog_and_reports_failures(self, import_product):
+        import_product.side_effect = self.fake_import
+        output = StringIO()
+
+        call_command("import_products_from_usda", stdout=output)
+
+        self.assertEqual(Product.objects.count(), len(PRODUCTS) - 1)
+        self.assertIn("Не знайдено: Сіль", output.getvalue())
+
+    @patch("fridge.management.commands.import_products_from_usda.import_product")
+    def test_only_new_skips_existing(self, import_product):
+        import_product.side_effect = self.fake_import
+        Product.objects.create(name="Гречка", default_unit="g", calories_per_100=346)
+
+        call_command("import_products_from_usda", "--only-new", stdout=StringIO())
+
+        names = [call.args[0] for call in import_product.call_args_list]
+        self.assertNotIn("Гречка", names)
+        self.assertEqual(len(names), len(PRODUCTS) - 1)

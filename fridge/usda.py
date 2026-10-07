@@ -1,3 +1,5 @@
+import re
+
 import requests
 from django.conf import settings
 
@@ -53,16 +55,20 @@ def clean_query(query):
     return " ".join(query.split())
 
 
+def words(text):
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def has_energy(food):
+    return pick(extract_nutrients(food), ENERGY_NUMBERS, unit="KCAL") is not None
+
+
 def choose_food(foods, query):
-    query = query.lower()
-    exact = [food for food in foods if food.get("description", "").lower() == query]
+    exact = [food for food in foods if food.get("description", "").lower() == query.lower()]
     if exact:
         return exact[0]
-    if "raw" in query:
-        raw = [food for food in foods if "raw" in food.get("description", "").lower()]
-        if raw:
-            return raw[0]
-    return foods[0]
+    query_words = words(query)
+    return max(foods, key=lambda food: len(query_words & words(food.get("description", ""))))
 
 
 def fetch_food(session, query, fdc_id=None):
@@ -73,14 +79,14 @@ def fetch_food(session, query, fdc_id=None):
 
     response = session.get(
         SEARCH_URL,
-        params={"query": clean_query(query), "dataType": "Foundation,SR Legacy", "pageSize": 5},
+        params={"query": clean_query(query), "dataType": "Foundation,SR Legacy", "pageSize": 10},
         timeout=TIMEOUT,
     )
     response.raise_for_status()
     foods = response.json().get("foods", [])
     if not foods:
         return None
-    return choose_food(foods, query)
+    return choose_food([food for food in foods if has_energy(food)] or foods, query)
 
 
 def import_product(name, query, unit, grams_per_piece=None, fdc_id=None, session=None):
