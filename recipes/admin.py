@@ -37,9 +37,10 @@ class CookingLogAdmin(admin.ModelAdmin):
 
 @admin.register(RecipeImport)
 class RecipeImportAdmin(admin.ModelAdmin):
-    list_display = ("url", "user", "status", "created_at")
+    list_display = ("url", "external_id", "user", "status", "created_at")
     list_filter = ("status",)
-    readonly_fields = ("user", "url", "status", "data", "error", "recipe", "created_at")
+    search_fields = ("url", "external_id")
+    readonly_fields = ("user", "url", "external_id", "status", "data", "error", "recipe", "created_at")
 
     def has_add_permission(self, request):
         return False

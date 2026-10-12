@@ -21,6 +21,7 @@ class RawRecipe:
     ingredients: list = field(default_factory=list)
     instructions: list = field(default_factory=list)
     yield_text: str = ""
+    category: str = ""
     page_text: str = ""
 
 

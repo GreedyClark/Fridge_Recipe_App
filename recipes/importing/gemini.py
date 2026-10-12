@@ -9,7 +9,7 @@ from pydantic import BaseModel, ValidationError
 
 from fridge.models import Product
 
-from .errors import ImportFailed
+from .errors import ImportFailed, QuotaExceeded
 
 MAX_SERVINGS = 20
 CHECK_QUANTITY = "Перевір кількість"
@@ -84,6 +84,8 @@ def build_prompt(raw, products):
         f"Сторінка: {raw.url}",
         f"Назва на сторінці: {raw.title or '-'}",
     ]
+    if raw.category:
+        parts.append(f"Категорія на сайті: {raw.category}")
     if raw.yield_text:
         parts.append(f"Порції: {raw.yield_text}")
     if raw.ingredients:
@@ -134,7 +136,7 @@ def ask_gemini(prompt, client=None, schema=ParsedRecipe, instruction=SYSTEM_INST
 
     if response is None:
         if isinstance(error, genai_errors.APIError) and error.code == QUOTA_EXCEEDED:
-            raise ImportFailed("Вичерпано ліміт запитів до Gemini. Спробуй трохи пізніше.") from error
+            raise QuotaExceeded("Вичерпано ліміт запитів до Gemini. Спробуй трохи пізніше.") from error
         raise ImportFailed("Gemini зараз перевантажений. Спробуй через кілька хвилин.") from error
 
     try:

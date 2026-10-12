@@ -153,6 +153,7 @@ class RecipeImport(models.Model):
         verbose_name="користувач",
     )
     url = models.URLField("посилання", max_length=500)
+    external_id = models.CharField("зовнішній id", max_length=50, blank=True)
     status = models.CharField("статус", max_length=10, choices=STATUS_CHOICES, default=DRAFT)
     data = models.JSONField("результат розбору", default=dict, blank=True)
     error = models.TextField("помилка", blank=True)
@@ -169,6 +170,13 @@ class RecipeImport(models.Model):
         ordering = ["-created_at"]
         verbose_name = "імпорт рецепта"
         verbose_name_plural = "імпорти рецептів"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["external_id"],
+                condition=~Q(external_id=""),
+                name="unique_import_external_id",
+            ),
+        ]
 
     def __str__(self):
         return f"{self.url} ({self.get_status_display()})"
