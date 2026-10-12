@@ -2,6 +2,7 @@ import json
 import socket
 from unittest.mock import Mock, patch
 
+from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase, override_settings
 from google.genai import errors as genai_errors
 
@@ -303,3 +304,19 @@ class GeminiParsingTests(TestCase):
         row = parse_recipe(self.raw, client=client)["ingredients"][0]
         self.assertTrue(row["optional"])
         self.assertEqual(row["quantity"], 200)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_catalog_includes_only_visible_products(self):
+        owner = User.objects.create_user("owner", password="pass12345")
+        stranger = User.objects.create_user("stranger", password="pass12345")
+        Product.objects.create(name="Бринза", default_unit="g", calories_per_100=264, owner=owner)
+        Product.objects.create(name="Чужий сир", default_unit="g", calories_per_100=300, owner=stranger)
+        client = self.gemini_returns(self.payload([
+            {"original": "гречка", "product_id": self.buckwheat.pk, "unit": "g", "quantity": 100},
+        ]))
+
+        parse_recipe(self.raw, client=client, user=owner)
+
+        prompt = client.models.generate_content.call_args.kwargs["contents"]
+        self.assertIn("Бринза", prompt)
+        self.assertNotIn("Чужий сир", prompt)

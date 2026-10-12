@@ -6,8 +6,8 @@ from .models import FridgeItem, Product
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ("name", "default_unit", "calories_per_100", "grams_per_piece", "usda_link")
-    list_filter = ("default_unit",)
+    list_display = ("name", "owner", "default_unit", "calories_per_100", "grams_per_piece", "usda_link")
+    list_filter = ("default_unit", ("owner", admin.EmptyFieldListFilter))
     search_fields = ("name",)
 
     @admin.display(description="USDA")

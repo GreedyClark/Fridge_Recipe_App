@@ -31,6 +31,11 @@ class FridgeFormMixin(UserFridgeMixin):
     template_name = "fridge/fridge_form.html"
     success_url = reverse_lazy("fridge:list")
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context["product_data"] = {
@@ -41,7 +46,7 @@ class FridgeFormMixin(UserFridgeMixin):
                 "fat": product.fat_per_100,
                 "carbs": product.carbs_per_100,
             }
-            for product in Product.objects.all()
+            for product in Product.objects.visible_to(self.request.user)
         }
         context["popular_products"] = self.get_popular_products()
         return context
@@ -56,7 +61,7 @@ class FridgeFormMixin(UserFridgeMixin):
             taken = {product.pk for product in popular}
             defaults = [
                 product
-                for product in Product.objects.filter(name__in=DEFAULT_POPULAR)
+                for product in Product.objects.shared().filter(name__in=DEFAULT_POPULAR)
                 if product.pk not in taken
             ]
             defaults.sort(key=lambda product: DEFAULT_POPULAR.index(product.name))

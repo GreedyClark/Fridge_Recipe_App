@@ -201,7 +201,8 @@ def build_draft(parsed, raw, products):
     }
 
 
-def parse_recipe(raw, client=None):
-    products = list(Product.objects.order_by("name"))
+def parse_recipe(raw, client=None, user=None):
+    products = Product.objects.visible_to(user) if user else Product.objects.shared()
+    products = list(products.order_by("name"))
     parsed = ask_gemini(build_prompt(raw, products), client=client)
     return build_draft(parsed, raw, products)

@@ -145,8 +145,10 @@ class ImportReviewViewTests(TestCase):
         data.update(changes)
         return data
 
-    def fake_import(self, name, query, unit, grams_per_piece=None, **kwargs):
-        product = Product.objects.create(name=name, default_unit=unit, calories_per_100=364, usda_query=query)
+    def fake_import(self, name, query, unit, grams_per_piece=None, owner=None, **kwargs):
+        product = Product.objects.create(
+            name=name, default_unit=unit, calories_per_100=364, usda_query=query, owner=owner
+        )
         return product, True, {}
 
     def test_page_shows_draft(self):
@@ -171,6 +173,7 @@ class ImportReviewViewTests(TestCase):
         self.assertEqual(recipe.source_url, "https://example.com/r/")
         names = sorted(ingredient.product.name for ingredient in recipe.ingredients.all())
         self.assertEqual(names, ["Борошно", "Гречка", "Яйце куряче"])
+        self.assertEqual(Product.objects.get(name="Борошно").owner, self.user)
         self.record.refresh_from_db()
         self.assertEqual(self.record.status, RecipeImport.SAVED)
         self.assertEqual(self.record.recipe, recipe)

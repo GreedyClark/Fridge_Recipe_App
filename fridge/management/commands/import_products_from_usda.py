@@ -17,7 +17,7 @@ class Command(BaseCommand):
         except USDAError as exc:
             raise CommandError(str(exc)) from exc
 
-        existing = set(Product.objects.values_list("name", flat=True)) if options["only_new"] else set()
+        existing = set(Product.objects.shared().values_list("name", flat=True)) if options["only_new"] else set()
         created = updated = 0
         failed = []
         for name, params in PRODUCTS.items():

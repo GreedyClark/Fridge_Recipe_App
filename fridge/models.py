@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 UNIT_CHOICES = [
@@ -11,13 +12,29 @@ UNIT_CHOICES = [
 ]
 
 
-class ProductManager(models.Manager):
+class ProductQuerySet(models.QuerySet):
+    def shared(self):
+        return self.filter(owner__isnull=True)
+
+    def visible_to(self, user):
+        return self.filter(Q(owner__isnull=True) | Q(owner=user))
+
+
+class ProductManager(models.Manager.from_queryset(ProductQuerySet)):
     def get_by_natural_key(self, name):
-        return self.get(name=name)
+        return self.get(name=name, owner__isnull=True)
 
 
 class Product(models.Model):
-    name = models.CharField("назва", max_length=100, unique=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="products",
+        verbose_name="власник",
+    )
+    name = models.CharField("назва", max_length=100)
     default_unit = models.CharField("одиниця", max_length=3, choices=UNIT_CHOICES, default="g")
     calories_per_100 = models.FloatField("ккал на 100 г")
     protein_per_100 = models.FloatField("білки на 100 г", null=True, blank=True)
@@ -33,6 +50,10 @@ class Product(models.Model):
         ordering = ["name"]
         verbose_name = "продукт"
         verbose_name_plural = "продукти"
+        constraints = [
+            models.UniqueConstraint(fields=["name"], condition=Q(owner__isnull=True), name="unique_shared_product_name"),
+            models.UniqueConstraint(fields=["owner", "name"], name="unique_private_product_name"),
+        ]
 
     def __str__(self):
         return self.name

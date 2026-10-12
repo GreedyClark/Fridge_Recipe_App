@@ -60,8 +60,9 @@ class ImportedIngredientForm(forms.Form):
     )
     optional = forms.BooleanField(required=False)
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.visible_to(user)
         self.fields["product"].empty_label = ""
         self.warning = ""
 

@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import FridgeItem
+from .models import FridgeItem, Product
 
 
 class FridgeItemForm(forms.ModelForm):
@@ -15,6 +15,7 @@ class FridgeItemForm(forms.ModelForm):
             "expiry_date": forms.DateInput(attrs={"class": "form-control", "type": "date"}, format="%Y-%m-%d"),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.visible_to(user)
         self.fields["product"].empty_label = "Оберіть продукт"

@@ -9,7 +9,7 @@ def run_import(record, session=None, client=None):
     try:
         page = fetch_page(record.url, session=session)
         raw = extract_recipe(page.content, page.url, page.encoding)
-        record.data = parse_recipe(raw, client=client)
+        record.data = parse_recipe(raw, client=client, user=record.user)
     except ImportFailed as exc:
         record.status = RecipeImport.FAILED
         record.error = str(exc)

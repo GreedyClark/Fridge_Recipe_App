@@ -2,11 +2,13 @@ from io import StringIO
 from unittest.mock import Mock, patch
 
 import requests
+from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
+from django.urls import reverse
 
 from .catalog import PRODUCTS
-from .models import Product
+from .models import FridgeItem, Product
 from .usda import ENERGY_NUMBERS, USDAError, choose_food, clean_query, extract_nutrients, import_product, pick
 
 SEARCH_FOOD = {
@@ -171,3 +173,35 @@ class ImportCommandTests(TestCase):
         names = [call.args[0] for call in import_product.call_args_list]
         self.assertNotIn("Гречка", names)
         self.assertEqual(len(names), len(PRODUCTS) - 1)
+
+class PrivateProductTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user("owner", password="pass12345")
+        self.stranger = User.objects.create_user("stranger", password="pass12345")
+        self.shared = Product.objects.create(name="Гречка", default_unit="g", calories_per_100=346)
+        self.private = Product.objects.create(name="Бринза", default_unit="g", calories_per_100=264,
+                                                  owner=self.owner)
+
+    def test_visible_to_owner_only(self):
+        self.assertEqual(set(Product.objects.visible_to(self.owner)), {self.shared, self.private})
+        self.assertEqual(set(Product.objects.visible_to(self.stranger)), {self.shared})
+
+    def test_fridge_form_lists_own_products(self):
+        self.client.force_login(self.owner)
+        self.assertContains(self.client.get(reverse("fridge:add")), "Бринза")
+        self.client.force_login(self.stranger)
+        self.assertNotContains(self.client.get(reverse("fridge:add")), "Бринза")
+
+    def test_cannot_add_foreign_private_product(self):
+        self.client.force_login(self.stranger)
+        response = self.client.post(reverse("fridge:add"), {"product": self.private.pk, "quantity": 100})
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(FridgeItem.objects.exists())
+
+    def test_same_private_name_for_different_users(self):
+        Product.objects.create(name="Бринза", default_unit="g", calories_per_100=264, owner=self.stranger)
+        self.assertEqual(Product.objects.filter(name="Бринза").count(), 2)
+
+    def test_natural_key_finds_shared_product(self):
+        Product.objects.create(name="Гречка", default_unit="g", calories_per_100=300, owner=self.owner)
+        self.assertEqual(Product.objects.get_by_natural_key("Гречка"), self.shared)

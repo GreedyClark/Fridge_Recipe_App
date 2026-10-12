@@ -13,8 +13,9 @@ class RowFailed(ImportFailed):
         self.index = index
 
 
-def resolve_products(rows):
-    catalog = {product.name.casefold(): product for product in Product.objects.all()}
+def resolve_products(rows, owner):
+    visible = Product.objects.visible_to(owner) if owner else Product.objects.shared()
+    catalog = {product.name.casefold(): product for product in visible}
     products = []
     for index, row in enumerate(rows):
         product = row.get("product")
@@ -23,7 +24,9 @@ def resolve_products(rows):
             product = catalog.get(name.casefold())
         if product is None:
             try:
-                product, _, _ = import_product(name, row["usda_query"], row["new_unit"] or "g", row["grams_per_piece"])
+                product, _, _ = import_product(
+                    name, row["usda_query"], row["new_unit"] or "g", row["grams_per_piece"], owner=owner
+                )
             except USDAError as exc:
                 raise RowFailed(index, f"Не вдалося знайти «{name}» у базі USDA. Обери продукт зі списку.") from exc
             catalog[product.name.casefold()] = product
@@ -34,7 +37,7 @@ def resolve_products(rows):
 
 
 def save_import(record, recipe_data, rows, steps):
-    products = resolve_products(rows)
+    products = resolve_products(rows, record.user)
 
     with transaction.atomic():
         record = RecipeImport.objects.select_for_update().get(pk=record.pk)
@@ -62,7 +65,7 @@ def save_import(record, recipe_data, rows, steps):
 
 
 def update_recipe(recipe, recipe_data, rows, steps):
-    products = resolve_products(rows)
+    products = resolve_products(rows, recipe.owner)
 
     with transaction.atomic():
         recipe.name = recipe_data["name"]

@@ -89,7 +89,7 @@ def fetch_food(session, query, fdc_id=None):
     return choose_food([food for food in foods if has_energy(food)] or foods, query)
 
 
-def import_product(name, query, unit, grams_per_piece=None, fdc_id=None, session=None):
+def import_product(name, query, unit, grams_per_piece=None, fdc_id=None, session=None, owner=None):
     session = session or make_session()
     try:
         food = fetch_food(session, query, fdc_id)
@@ -106,6 +106,7 @@ def import_product(name, query, unit, grams_per_piece=None, fdc_id=None, session
 
     product, created = Product.objects.update_or_create(
         name=name,
+        owner=owner,
         defaults={
             "default_unit": unit,
             "calories_per_100": calories,

@@ -8,8 +8,8 @@ from django.db import transaction
 from django.db.models import Count, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import DeleteView, DetailView, FormView, ListView, TemplateView
 
@@ -129,6 +129,7 @@ class RecipeDeleteView(LoginRequiredMixin, DeleteView):
     def form_valid(self, form):
         messages.success(self.request, f"Рецепт «{self.object.name}» видалено.")
         return super().form_valid(form)
+
 
 class CookRecipeView(LoginRequiredMixin, View):
     def post(self, request, pk):
@@ -266,7 +267,7 @@ def ingredient_initial(row):
 
 def bind_editor(request):
     recipe_form = ImportedRecipeForm(request.POST, request.FILES)
-    formset = ImportedIngredientFormSet(request.POST, prefix="ingredients")
+    formset = ImportedIngredientFormSet(request.POST, prefix="ingredients", form_kwargs={"user": request.user})
     steps = [step.strip() for step in request.POST.getlist("steps") if step.strip()]
 
     recipe_valid = recipe_form.is_valid()
@@ -287,8 +288,8 @@ def save_editor(save, recipe_form, formset, steps):
     return None
 
 
-def editor_context(recipe_form, formset, steps):
-    units = {str(product.pk): product.get_default_unit_display() for product in Product.objects.all()}
+def editor_context(recipe_form, formset, steps, user):
+    units = {str(product.pk): product.get_default_unit_display() for product in Product.objects.visible_to(user)}
     for form in formset.forms:
         product_id = str(form.value_of("product"))
         form.unit = units.get(product_id) or UNIT_LABELS.get(form.value_of("new_unit"), "—")
@@ -312,7 +313,11 @@ class ImportReviewView(LoginRequiredMixin, View):
         data = record.data
         recipe_form = ImportedRecipeForm(initial={"name": data.get("name"), "servings": data.get("servings")})
         rows = data.get("ingredients", [])
-        formset = ImportedIngredientFormSet(prefix="ingredients", initial=[ingredient_initial(row) for row in rows])
+        formset = ImportedIngredientFormSet(
+            prefix="ingredients",
+            initial=[ingredient_initial(row) for row in rows],
+            form_kwargs={"user": request.user},
+        )
         for form, row in zip(formset.forms, rows):
             form.warning = row.get("warning", "")
         return self.render(record, recipe_form, formset, data.get("steps", []))
@@ -331,7 +336,7 @@ class ImportReviewView(LoginRequiredMixin, View):
 
     def render(self, record, recipe_form, formset, steps):
         source_url = record.data.get("source_url") or record.url
-        context = editor_context(recipe_form, formset, steps)
+        context = editor_context(recipe_form, formset, steps, self.request.user)
         context.update({
             "record": record,
             "warning_count": sum(1 for form in formset.forms if form.warning),
@@ -359,7 +364,11 @@ class RecipeEditView(LoginRequiredMixin, View):
             {"product_id": ingredient.product_id, "quantity": ingredient.quantity, "optional": ingredient.optional}
             for ingredient in recipe.ingredients.all()
         ]
-        formset = ImportedIngredientFormSet(prefix="ingredients", initial=[ingredient_initial(row) for row in rows])
+        formset = ImportedIngredientFormSet(
+            prefix="ingredients",
+            initial=[ingredient_initial(row) for row in rows],
+            form_kwargs={"user": request.user},
+        )
         return self.render(recipe, recipe_form, formset, recipe.steps)
 
     def post(self, request, pk):
@@ -375,7 +384,7 @@ class RecipeEditView(LoginRequiredMixin, View):
         return self.render(recipe, recipe_form, formset, steps or request.POST.getlist("steps"))
 
     def render(self, recipe, recipe_form, formset, steps):
-        context = editor_context(recipe_form, formset, steps)
+        context = editor_context(recipe_form, formset, steps, self.request.user)
         context.update({
             "recipe": recipe,
             "editing": True,
