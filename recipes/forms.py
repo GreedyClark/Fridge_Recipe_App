@@ -3,6 +3,8 @@ from django.forms import BaseFormSet, formset_factory
 
 from fridge.models import UNIT_CHOICES, Product
 
+from .models import Recipe
+
 UNIT_LABELS = dict(UNIT_CHOICES)
 
 
@@ -27,6 +29,12 @@ class ImportedRecipeForm(forms.Form):
         max_length=150,
         error_messages={"required": "Вкажи назву рецепта."},
         widget=forms.TextInput(attrs={"class": "form-control"}),
+    )
+    meal_type = forms.ChoiceField(
+        label="Прийом їжі",
+        choices=[("", "Не вказано"), *Recipe.MEAL_CHOICES],
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
     servings = forms.IntegerField(
         label="Порцій",

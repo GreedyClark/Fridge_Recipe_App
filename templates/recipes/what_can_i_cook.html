@@ -18,6 +18,8 @@
     </p>
 </div>
 
+{% include "recipes/_meal_tabs.html" %}
+
 {% if missing_products %}
     <div class="card mb-5">
         <div class="card-body p-4 d-flex flex-column gap-3">
@@ -51,6 +53,7 @@
                     <a href="{% url 'recipes:detail' match.recipe.pk %}" class="card recipe-card h-100">
                         {% include "recipes/_photo.html" with recipe=match.recipe photo_class="recipe-card-photo" %}
                         <div class="card-body d-flex flex-column gap-2">
+                            {% include "recipes/_meal_label.html" with recipe=match.recipe %}
                             <h3 class="recipe-card-title">{{ match.recipe.name }}</h3>
                             <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="kcal"><i class="ti ti-flame"></i>≈ {{ match.nutrition.calories }} ккал</span>
@@ -77,6 +80,7 @@
                     <a href="{% url 'recipes:detail' match.recipe.pk %}" class="card recipe-card h-100">
                         {% include "recipes/_photo.html" with recipe=match.recipe photo_class="recipe-card-photo" %}
                         <div class="card-body d-flex flex-column gap-2">
+                            {% include "recipes/_meal_label.html" with recipe=match.recipe %}
                             <h3 class="recipe-card-title">{{ match.recipe.name }}</h3>
                             <span class="kcal"><i class="ti ti-flame"></i>≈ {{ match.nutrition.calories }} ккал</span>
                             <div class="lacking-box">
@@ -117,7 +121,8 @@
                             <a href="{% url 'recipes:detail' match.recipe.pk %}" class="card recipe-card h-100">
                                 {% include "recipes/_photo.html" with recipe=match.recipe photo_class="recipe-card-photo-sm" %}
                                 <div class="card-body d-flex flex-column gap-2">
-                                    <h3 class="recipe-card-title">{{ match.recipe.name }}</h3>
+                                    {% include "recipes/_meal_label.html" with recipe=match.recipe %}
+                            <h3 class="recipe-card-title">{{ match.recipe.name }}</h3>
                                     <div class="mt-auto">{% include "recipes/_status_badge.html" %}</div>
                                 </div>
                             </a>

@@ -1,5 +1,5 @@
 from datetime import timedelta
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.contrib import messages
@@ -57,6 +57,35 @@ def passes_filter(match, key, user):
     return True
 
 
+MEALS = [("all", "Будь-коли"), *Recipe.MEAL_CHOICES]
+
+
+def passes_meal(match, key):
+    return key == "all" or match.recipe.meal_type == key
+
+
+def selected(request, name, options):
+    value = request.GET.get(name, "all")
+    return value if value in dict(options) else "all"
+
+
+def page_url(**params):
+    query = {key: value for key, value in params.items() if value and value != "all"}
+    return f"?{urlencode(query)}" if query else "?"
+
+
+def meal_tabs(matches, active, **params):
+    return [
+        {
+            "label": label,
+            "count": sum(1 for match in matches if passes_meal(match, key)),
+            "active": key == active,
+            "url": page_url(**params, meal=key),
+        }
+        for key, label in MEALS
+    ]
+
+
 def matches_query(match, query):
     names = [match.recipe.name] + [ingredient.product.name for ingredient in match.ingredients]
     return any(query in name.casefold() for name in names)
@@ -67,27 +96,31 @@ class RecipeListView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
         query = self.request.GET.get("q", "").strip()
-        active = self.request.GET.get("filter", "all")
-        if active not in dict(FILTERS):
-            active = "all"
+        active = selected(self.request, "filter", FILTERS)
+        meal = selected(self.request, "meal", MEALS)
 
-        matches = match_recipes(self.request.user)
+        matches = match_recipes(user)
         if query:
             matches = [match for match in matches if matches_query(match, query.casefold())]
+        by_meal = [match for match in matches if passes_meal(match, meal)]
+        by_filter = [match for match in matches if passes_filter(match, active, user)]
 
         context["filters"] = [
             {
-                "key": key,
                 "label": label,
-                "count": sum(1 for match in matches if passes_filter(match, key, self.request.user)),
+                "count": sum(1 for match in by_meal if passes_filter(match, key, user)),
                 "active": key == active,
+                "url": page_url(q=query, filter=key, meal=meal),
             }
             for key, label in FILTERS
         ]
-        context["matches"] = [match for match in matches if passes_filter(match, active, self.request.user)]
+        context["meals"] = meal_tabs(by_filter, meal, q=query, filter=active)
+        context["matches"] = [match for match in by_filter if passes_meal(match, meal)]
         context["query"] = query
         context["active_filter"] = active
+        context["active_meal"] = meal
         return context
 
 
@@ -96,7 +129,11 @@ class WhatCanICookView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        matches = match_recipes(self.request.user)
+        meal = selected(self.request, "meal", MEALS)
+        all_matches = match_recipes(self.request.user)
+        matches = [match for match in all_matches if passes_meal(match, meal)]
+        context["meals"] = meal_tabs(all_matches, meal)
+        context["active_meal"] = meal
         context["ready"] = [match for match in matches if match.status == READY]
         context["almost"] = [match for match in matches if match.status == ALMOST]
         context["missing"] = [match for match in matches if match.status == MISSING]
@@ -311,7 +348,9 @@ class ImportReviewView(LoginRequiredMixin, View):
     def get(self, request, pk):
         record = self.get_record()
         data = record.data
-        recipe_form = ImportedRecipeForm(initial={"name": data.get("name"), "servings": data.get("servings")})
+        recipe_form = ImportedRecipeForm(
+            initial={"name": data.get("name"), "meal_type": data.get("meal_type", ""), "servings": data.get("servings")}
+        )
         rows = data.get("ingredients", [])
         formset = ImportedIngredientFormSet(
             prefix="ingredients",
@@ -359,7 +398,9 @@ class RecipeEditView(LoginRequiredMixin, View):
 
     def get(self, request, pk):
         recipe = self.get_recipe()
-        recipe_form = ImportedRecipeForm(initial={"name": recipe.name, "servings": recipe.servings})
+        recipe_form = ImportedRecipeForm(
+            initial={"name": recipe.name, "meal_type": recipe.meal_type, "servings": recipe.servings}
+        )
         rows = [
             {"product_id": ingredient.product_id, "quantity": ingredient.quantity, "optional": ingredient.optional}
             for ingredient in recipe.ingredients.all()

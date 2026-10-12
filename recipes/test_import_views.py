@@ -163,9 +163,10 @@ class ImportReviewViewTests(TestCase):
     def test_saves_private_recipe(self, import_product):
         import_product.side_effect = self.fake_import
 
-        response = self.client.post(self.url, self.form_data())
+        response = self.client.post(self.url, self.form_data(meal_type="lunch"))
 
         recipe = Recipe.objects.get()
+        self.assertEqual(recipe.meal_type, "lunch")
         self.assertRedirects(response, reverse("recipes:detail", args=[recipe.pk]))
         self.assertEqual(recipe.owner, self.user)
         self.assertEqual(recipe.instructions, "Зварити гречку.\nСформувати котлети.")

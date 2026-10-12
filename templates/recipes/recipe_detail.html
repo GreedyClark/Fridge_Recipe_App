@@ -26,6 +26,7 @@
             <h1 class="page-title">{{ recipe.name }}</h1>
             {% with ingredients_count=match.ingredients|length %}
                 <p class="text-secondary mt-2 mb-0">
+                    {% if recipe.meal_type %}{{ recipe.get_meal_type_display }} ·{% endif %}
                     {{ recipe.servings }} {{ recipe.servings|uk_plural:"порція,порції,порцій" }} ·
                     {{ ingredients_count }} {{ ingredients_count|uk_plural:"інгредієнт,інгредієнти,інгредієнтів" }} ·
                     БЖУ розраховано з даних USDA

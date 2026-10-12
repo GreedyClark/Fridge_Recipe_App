@@ -16,15 +16,18 @@
     <label for="recipe-search" class="visually-hidden">Пошук</label>
     <input id="recipe-search" type="search" name="q" value="{{ query }}" placeholder="Знайти рецепт або продукт">
     {% if active_filter != "all" %}<input type="hidden" name="filter" value="{{ active_filter }}">{% endif %}
+    {% if active_meal != "all" %}<input type="hidden" name="meal" value="{{ active_meal }}">{% endif %}
 </form>
 
-<div class="d-flex flex-wrap gap-2 mb-4">
+<div class="d-flex flex-wrap gap-2 mb-3">
     {% for item in filters %}
-        <a href="?{% if query %}q={{ query|urlencode }}&{% endif %}filter={{ item.key }}" class="chip{% if item.active %} active{% endif %}">
+        <a href="{{ item.url }}" class="chip{% if item.active %} active{% endif %}">
             {{ item.label }} <span class="chip-count">{{ item.count }}</span>
         </a>
     {% endfor %}
 </div>
+
+{% include "recipes/_meal_tabs.html" %}
 
 {% if matches %}
     <div class="row row-cols-2 row-cols-lg-4 g-3">
@@ -34,6 +37,7 @@
                     {% include "recipes/_photo.html" with recipe=match.recipe photo_class="recipe-card-photo" %}
                     {% if match.recipe.owner_id %}<span class="mine-badge">Мій</span>{% endif %}
                     <div class="card-body d-flex flex-column gap-2">
+                        {% include "recipes/_meal_label.html" with recipe=match.recipe %}
                         <h2 class="recipe-card-title">{{ match.recipe.name }}</h2>
                         <span class="kcal"><i class="ti ti-flame"></i>≈ {{ match.nutrition.calories }} ккал</span>
                         <div class="mt-auto">{% include "recipes/_status_badge.html" %}</div>
@@ -42,7 +46,7 @@
             </div>
         {% endfor %}
     </div>
-{% elif active_filter == "mine" and not query %}
+{% elif active_filter == "mine" and active_meal == "all" and not query %}
     <div class="card">
         <div class="card-body empty-state">
             <span class="empty-icon"><i class="ti ti-download"></i></span>

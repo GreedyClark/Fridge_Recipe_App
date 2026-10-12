@@ -21,6 +21,17 @@ class RecipeQuerySet(models.QuerySet):
 
 
 class Recipe(models.Model):
+    BREAKFAST = "breakfast"
+    LUNCH = "lunch"
+    DINNER = "dinner"
+    SNACK = "snack"
+    MEAL_CHOICES = [
+        (BREAKFAST, "Сніданок"),
+        (LUNCH, "Обід"),
+        (DINNER, "Вечеря"),
+        (SNACK, "Перекус"),
+    ]
+
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
@@ -30,6 +41,7 @@ class Recipe(models.Model):
         verbose_name="власник",
     )
     name = models.CharField("назва", max_length=150)
+    meal_type = models.CharField("прийом їжі", max_length=10, choices=MEAL_CHOICES, blank=True)
     instructions = models.TextField("приготування", help_text="Кожен крок з нового рядка.")
     image = models.ImageField("фото", upload_to="recipes/", blank=True)
     image_url = models.URLField("фото з джерела", max_length=500, blank=True)

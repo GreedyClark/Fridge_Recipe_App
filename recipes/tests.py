@@ -160,10 +160,11 @@ class RecipeEditTests(RecipeTestMixin, TestCase):
     def test_owner_saves_changes(self):
         self.client.force_login(self.owner)
 
-        response = self.client.post(self.url, self.form_data())
+        response = self.client.post(self.url, self.form_data(meal_type="breakfast"))
 
         self.assertRedirects(response, reverse("recipes:detail", args=[self.recipe.pk]))
         self.recipe.refresh_from_db()
+        self.assertEqual(self.recipe.meal_type, "breakfast")
         self.assertEqual(self.recipe.name, "Яєчня з молоком")
         self.assertEqual(self.recipe.servings, 2)
         self.assertEqual(self.recipe.steps, ["Збити яйця з молоком.", "Посмажити."])
@@ -184,3 +185,45 @@ class RecipeEditTests(RecipeTestMixin, TestCase):
         self.assertEqual(self.client.get(self.url).status_code, 404)
         self.assertEqual(self.client.post(self.url, self.form_data()).status_code, 404)
         self.assertEqual(self.client.get(reverse("recipes:edit", args=[shared.pk])).status_code, 404)
+
+class MealTypeTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.omelette = self.make_recipe(name="Омлет")
+        self.omelette.meal_type = Recipe.BREAKFAST
+        self.omelette.save()
+        self.soup = Recipe.objects.create(name="Суп", instructions="Зварити.", meal_type=Recipe.LUNCH)
+        RecipeIngredient.objects.create(recipe=self.soup, product=self.salt, quantity=5)
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=10)
+        self.client.force_login(self.owner)
+
+    def names(self, response, key="matches"):
+        return [match.recipe.name for match in response.context[key]]
+
+    def test_list_filters_by_meal(self):
+        response = self.client.get(reverse("recipes:list"), {"meal": "breakfast"})
+        self.assertEqual(self.names(response), ["Омлет"])
+        self.assertContains(response, "Сніданок")
+
+    def test_meal_and_status_filters_combine(self):
+        response = self.client.get(reverse("recipes:list"), {"meal": "lunch", "filter": "ready"})
+        self.assertEqual(self.names(response), [])
+        meals = {item["label"]: item["count"] for item in response.context["meals"]}
+        self.assertEqual(meals["Сніданок"], 1)
+        self.assertEqual(meals["Обід"], 0)
+        ready = next(item for item in response.context["filters"] if item["label"] == "Можна приготувати")
+        self.assertEqual(ready["url"], "?filter=ready&meal=lunch")
+
+    def test_unknown_meal_shows_all(self):
+        response = self.client.get(reverse("recipes:list"), {"meal": "brunch"})
+        self.assertEqual(sorted(self.names(response)), ["Омлет", "Суп"])
+
+    def test_what_can_i_cook_filters_by_meal(self):
+        response = self.client.get(reverse("recipes:what_can_i_cook"), {"meal": "lunch"})
+        self.assertEqual(self.names(response, "ready"), [])
+        response = self.client.get(reverse("recipes:what_can_i_cook"), {"meal": "breakfast"})
+        self.assertEqual(self.names(response, "ready"), ["Омлет"])
+
+    def test_detail_shows_meal(self):
+        response = self.client.get(reverse("recipes:detail", args=[self.soup.pk]))
+        self.assertContains(response, "Обід ·")

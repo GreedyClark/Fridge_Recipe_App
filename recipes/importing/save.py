@@ -47,6 +47,7 @@ def save_import(record, recipe_data, rows, steps):
         recipe = Recipe.objects.create(
             owner=record.user,
             name=recipe_data["name"],
+            meal_type=recipe_data.get("meal_type", ""),
             servings=recipe_data["servings"],
             instructions="\n".join(steps),
             image=recipe_data.get("image") or "",
@@ -69,6 +70,7 @@ def update_recipe(recipe, recipe_data, rows, steps):
 
     with transaction.atomic():
         recipe.name = recipe_data["name"]
+        recipe.meal_type = recipe_data.get("meal_type", "")
         recipe.servings = recipe_data["servings"]
         recipe.instructions = "\n".join(steps)
         if recipe_data.get("image"):

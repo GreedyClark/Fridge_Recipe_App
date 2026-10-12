@@ -332,3 +332,13 @@ class GeminiParsingTests(TestCase):
         client = self.gemini_returns({"is_food": False, "usda_query": ""})
         with self.assertRaisesMessage(ImportFailed, "не схоже на продукт"):
             usda_query_for("Табуретка", client=client)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_meal_type_in_draft(self):
+        ingredients = [{"original": "гречка", "product_id": self.buckwheat.pk, "unit": "g", "quantity": 100}]
+        client = self.gemini_returns(self.payload(ingredients, meal_type="breakfast"))
+        self.assertEqual(parse_recipe(self.raw, client=client)["meal_type"], "breakfast")
+
+        client = self.gemini_returns(self.payload(ingredients))
+        self.assertEqual(parse_recipe(self.raw, client=client)["meal_type"], "")
+
