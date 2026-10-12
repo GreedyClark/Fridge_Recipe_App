@@ -1,7 +1,0 @@
-<div class="meal-tabs mb-4" role="group" aria-label="Прийом їжі">
-    {% for item in meals %}
-        <a href="{{ item.url }}" class="meal-tab{% if item.active %} active{% endif %}"{% if item.active %} aria-current="true"{% endif %}>
-            {{ item.label }} <span class="meal-tab-count">{{ item.count }}</span>
-        </a>
-    {% endfor %}
-</div>
