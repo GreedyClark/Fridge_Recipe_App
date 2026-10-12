@@ -1,11 +1,16 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count
-from django.urls import reverse_lazy
-from django.views.generic import CreateView, DeleteView, ListView, UpdateView
+from django.shortcuts import redirect
+from django.urls import reverse, reverse_lazy
+from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
-from .forms import FridgeItemForm
+from recipes.importing.errors import ImportFailed
+from recipes.importing.gemini import usda_query_for
+
+from .forms import FridgeItemForm, ProductCreateForm
 from .models import FridgeItem, Product
+from .usda import USDAError, import_product
 
 POPULAR_LIMIT = 5
 DEFAULT_POPULAR = ["Яйце куряче", "Молоко 2.5%", "Хліб пшеничний", "Банан", "Картопля"]
@@ -97,3 +102,33 @@ class FridgeDeleteView(UserFridgeMixin, DeleteView):
     def form_valid(self, form):
         messages.success(self.request, f"Видалено: {self.object.product.name}")
         return super().form_valid(form)
+
+
+
+class ProductCreateView(LoginRequiredMixin, FormView):
+    template_name = "fridge/product_form.html"
+    form_class = ProductCreateForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["user"] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        try:
+            query = usda_query_for(data["name"])
+            product, _, _ = import_product(
+                data["name"], query, data["unit"], data["grams_per_piece"], owner=self.request.user
+            )
+        except ImportFailed as exc:
+            form.add_error("name", str(exc))
+            return self.form_invalid(form)
+        except USDAError:
+            form.add_error("name", f"Не знайшли «{data['name']}» у базі USDA. Спробуй іншу, простішу назву.")
+            return self.form_invalid(form)
+
+        messages.success(
+            self.request, f"Продукт «{product.name}» додано: {product.calories_per_100:g} ккал на 100 г."
+        )
+        return redirect(f"{reverse('fridge:add')}?product={product.pk}")

@@ -5,7 +5,9 @@ import requests
 from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
+
+from recipes.importing.errors import ImportFailed
 
 from .catalog import PRODUCTS
 from .models import FridgeItem, Product
@@ -205,3 +207,69 @@ class PrivateProductTests(TestCase):
     def test_natural_key_finds_shared_product(self):
         Product.objects.create(name="Гречка", default_unit="g", calories_per_100=300, owner=self.owner)
         self.assertEqual(Product.objects.get_by_natural_key("Гречка"), self.shared)
+
+
+
+class ProductCreateTests(TestCase):
+    url = reverse_lazy("fridge:product_new")
+
+    def setUp(self):
+        self.user = User.objects.create_user("cook", password="pass12345")
+        self.client.force_login(self.user)
+
+    def fake_import(self, name, query, unit, grams_per_piece=None, owner=None, **kwargs):
+        product = Product.objects.create(
+            name=name, default_unit=unit, calories_per_100=264, grams_per_piece=grams_per_piece, owner=owner
+        )
+        return product, True, {}
+
+    def test_page_opens(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Новий продукт")
+        self.assertContains(response, "Знайти й додати")
+
+    @patch("fridge.views.import_product")
+    @patch("fridge.views.usda_query_for", return_value="Cheese, feta")
+    def test_creates_private_product(self, usda_query_for, import_product):
+        import_product.side_effect = self.fake_import
+
+        response = self.client.post(self.url, {"name": "  бринза ", "unit": "g"})
+
+        product = Product.objects.get(name="Бринза")
+        self.assertRedirects(response, f"{reverse('fridge:add')}?product={product.pk}")
+        self.assertEqual(product.owner, self.user)
+        usda_query_for.assert_called_once_with("Бринза")
+        self.assertEqual(import_product.call_args.args[:4], ("Бринза", "Cheese, feta", "g", None))
+
+    @patch("fridge.views.import_product")
+    @patch("fridge.views.usda_query_for", return_value="Peaches, raw")
+    def test_pieces_need_weight(self, usda_query_for, import_product):
+        response = self.client.post(self.url, {"name": "Нектарин", "unit": "pcs"})
+        self.assertContains(response, "Вкажи вагу однієї штуки")
+        usda_query_for.assert_not_called()
+
+        import_product.side_effect = self.fake_import
+        self.client.post(self.url, {"name": "Нектарин", "unit": "pcs", "grams_per_piece": "140"})
+        self.assertEqual(Product.objects.get(name="Нектарин").grams_per_piece, 140)
+
+    @patch("fridge.views.usda_query_for")
+    def test_existing_product_is_rejected(self, usda_query_for):
+        Product.objects.create(name="Гречка", default_unit="g", calories_per_100=346)
+        response = self.client.post(self.url, {"name": "гречка", "unit": "g"})
+        self.assertContains(response, "уже є в довіднику")
+        usda_query_for.assert_not_called()
+
+    @patch("fridge.views.import_product", side_effect=USDAError("нічого не знайдено"))
+    @patch("fridge.views.usda_query_for", return_value="Something strange")
+    def test_usda_not_found(self, usda_query_for, import_product):
+        response = self.client.post(self.url, {"name": "Щось дивне", "unit": "g"})
+        self.assertContains(response, "Не знайшли «Щось дивне» у базі USDA")
+        self.assertFalse(Product.objects.filter(name="Щось дивне").exists())
+
+    @patch("fridge.views.usda_query_for", side_effect=ImportFailed("Gemini зараз перевантажений. Спробуй через кілька хвилин."))
+    def test_gemini_failure_is_shown(self, usda_query_for):
+        response = self.client.post(self.url, {"name": "Бринза", "unit": "g"})
+        self.assertContains(response, "Gemini зараз перевантажений")
+
+    def test_fridge_form_links_to_new_product(self):
+        self.assertContains(self.client.get(reverse("fridge:add")), self.url)

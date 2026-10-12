@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Новий продукт · Fridge Recipe{% endblock %}
+
+{% block content %}
+<a href="{% url 'fridge:add' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>До додавання продукту</a>
+
+<div class="mb-4">
+    <div class="page-label">Холодильник</div>
+    <h1 class="page-title">Новий продукт</h1>
+    <p class="text-secondary mb-0 mt-2 page-lead">Продукту немає в довіднику? Додай його, а калорійність і БЖУ підтягнемо з бази USDA.</p>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-7">
+        <div class="card">
+            <div class="card-body p-4">
+                <form method="post" novalidate class="d-flex flex-column gap-4" id="product-form">
+                    {% csrf_token %}
+                    <div>
+                        <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                            <div class="field-error">{{ form.name.errors|join:" " }}</div>
+                        {% else %}
+                            <div class="form-text">Пиши так, як назвав би в магазині. Gemini перекладе назву для пошуку в USDA.</div>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        <span class="form-label d-block" id="unit-label">{{ form.unit.label }}</span>
+                        <div class="segmented" role="radiogroup" aria-labelledby="unit-label">
+                            {% for choice in form.unit %}
+                                <label class="segmented-option">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div id="pieces-field"{% if form.unit.value != "pcs" %} class="d-none"{% endif %}>
+                        <label for="{{ form.grams_per_piece.id_for_label }}" class="form-label">{{ form.grams_per_piece.label }}</label>
+                        <div class="qty-field">
+                            {{ form.grams_per_piece }}
+                            <span class="qty-unit">г</span>
+                        </div>
+                        {% if form.grams_per_piece.errors %}
+                            <div class="field-error">{{ form.grams_per_piece.errors|join:" " }}</div>
+                        {% else %}
+                            <div class="form-text">Потрібно, щоб рахувати калорії, коли продукт вимірюється штуками</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="submit" class="btn btn-primary" id="product-submit"><i class="ti ti-search"></i>Знайти й додати</button>
+                        <a href="{% url 'fridge:add' %}" class="btn btn-ghost">Скасувати</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+                <div class="page-label">Як це працює</div>
+                <div class="how-step">
+                    <span class="how-num">1</span>
+                    <div><div class="fw-bold">Напиши назву</div><div class="text-secondary small">Українською, як звик. Одиницю обери одразу.</div></div>
+                </div>
+                <div class="how-step">
+                    <span class="how-num">2</span>
+                    <div><div class="fw-bold">Шукаємо в USDA</div><div class="text-secondary small">Gemini перекладає назву, а калорійність і БЖУ беремо з бази USDA.</div></div>
+                </div>
+                <div class="how-step">
+                    <span class="how-num">3</span>
+                    <div><div class="fw-bold">Продукт у формі</div><div class="text-secondary small">Повернешся до додавання з уже вибраним продуктом.</div></div>
+                </div>
+                <div class="d-flex gap-2 text-secondary small border-top pt-3">
+                    <i class="ti ti-lock text-accent"></i>
+                    <span>Новий продукт бачиш лише ти. Спільний довідник не змінюється.</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const piecesField = document.getElementById("pieces-field");
+    document.querySelectorAll("input[name='unit']").forEach((radio) => {
+        radio.addEventListener("change", () => {
+            piecesField.classList.toggle("d-none", radio.value !== "pcs" || !radio.checked);
+        });
+    });
+
+    document.getElementById("product-form").addEventListener("submit", () => {
+        const button = document.getElementById("product-submit");
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm" aria-hidden="true"></span>Шукаю в USDA…';
+    });
+</script>
+{% endblock %}

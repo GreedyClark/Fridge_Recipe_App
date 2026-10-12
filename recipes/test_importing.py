@@ -11,7 +11,7 @@ from fridge.models import Product
 from .importing.errors import ImportFailed
 from .importing.extract import RawRecipe, extract_recipe
 from .importing.fetch import ensure_public_url, fetch_page
-from .importing.gemini import CHECK_QUANTITY, CHOOSE_PRODUCT, parse_recipe
+from .importing.gemini import CHECK_QUANTITY, CHOOSE_PRODUCT, parse_recipe, usda_query_for
 
 PUBLIC_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 443))]
 PRIVATE_ADDRESS = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.5", 443))]
@@ -320,3 +320,15 @@ class GeminiParsingTests(TestCase):
         prompt = client.models.generate_content.call_args.kwargs["contents"]
         self.assertIn("Бринза", prompt)
         self.assertNotIn("Чужий сир", prompt)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_usda_query_for_product(self):
+        client = self.gemini_returns({"is_food": True, "usda_query": " Cheese, feta "})
+        self.assertEqual(usda_query_for("Бринза", client=client), "Cheese, feta")
+        self.assertIn("Бринза", client.models.generate_content.call_args.kwargs["contents"])
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_usda_query_for_not_food(self):
+        client = self.gemini_returns({"is_food": False, "usda_query": ""})
+        with self.assertRaisesMessage(ImportFailed, "не схоже на продукт"):
+            usda_query_for("Табуретка", client=client)

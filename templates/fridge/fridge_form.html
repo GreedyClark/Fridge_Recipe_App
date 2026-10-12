@@ -28,6 +28,12 @@
                         <label for="{{ form.product.id_for_label }}" class="form-label">Продукт</label>
                         {{ form.product }}
                         {% if form.product.errors %}<div class="field-error">{{ form.product.errors|join:" " }}</div>{% endif %}
+                                            {% if not object %}
+                            <div class="form-text">
+                                Немає в списку?
+                                <a href="{% url 'fridge:product_new' %}" class="add-product-link"><i class="ti ti-plus"></i>Додати новий продукт</a>
+                            </div>
+                        {% endif %}
                     </div>
 
                     {% if not object and popular_products %}
