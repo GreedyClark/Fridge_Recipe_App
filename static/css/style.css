@@ -861,18 +861,25 @@ h1, h2, h3, .display-num {
 
 .week-chart {
     display: flex;
-    align-items: stretch;
-    gap: .625rem;
-    height: 210px;
+    flex-direction: column;
+    gap: .375rem;
 }
 
-.week-bar {
-    flex: 1 1 0;
+.week-row {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: .375rem;
+    gap: .625rem;
+}
+
+.week-row > * {
+    flex: 1 1 0;
     min-width: 0;
+    text-align: center;
+}
+
+.week-tracks {
+    position: relative;
+    height: 160px;
+    align-items: flex-end;
 }
 
 .week-bar-value {
@@ -883,15 +890,15 @@ h1, h2, h3, .display-num {
 }
 
 .week-bar-track {
-    flex-grow: 1;
-    width: 100%;
-    max-width: 44px;
+    height: 100%;
     display: flex;
     align-items: flex-end;
+    justify-content: center;
 }
 
 .week-bar-fill {
     width: 100%;
+    max-width: 44px;
     min-height: 4px;
     background: var(--fr-line);
     border-radius: 10px;
@@ -903,14 +910,51 @@ h1, h2, h3, .display-num {
     color: var(--fr-muted);
 }
 
-.week-bar.is-today .week-bar-fill {
+.week-bar-fill.is-today {
     background: var(--fr-accent);
 }
 
-.week-bar.is-today .week-bar-value,
-.week-bar.is-today .week-bar-label {
+.week-bar-fill.over {
+    background: var(--fr-warn);
+}
+
+.week-bar-value.is-today,
+.week-bar-label.is-today {
     color: var(--fr-text);
     font-weight: 800;
+}
+
+.week-bar-value.over {
+    color: var(--fr-warn);
+}
+
+.week-norm {
+    position: absolute;
+    left: 0;
+    right: 0;
+    border-top: 2px dashed rgba(243, 243, 241, .55);
+    z-index: 1;
+    pointer-events: none;
+}
+
+.week-legend {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-size: .8rem;
+}
+
+.legend-line {
+    width: 18px;
+    border-top: 2px dashed var(--fr-text);
+}
+
+.legend-over {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    background: var(--fr-warn);
+    margin-left: .5rem;
 }
 
 .log-row {
@@ -1393,4 +1437,111 @@ a.photo-credit:hover {
 
 .cook-bar .cook-form {
     gap: .75rem;
+}
+
+.today-norm {
+    font-family: var(--fr-display);
+    font-weight: 600;
+    font-size: 1.75rem;
+    color: #3D4514;
+}
+
+.today-progress {
+    height: 12px;
+    background: rgba(18, 18, 18, .18);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.today-progress-fill {
+    height: 100%;
+    background: var(--fr-on-accent);
+    border-radius: 999px;
+}
+
+.today-progress.over .today-progress-fill {
+    background: #B4451F;
+}
+
+.norm-edit {
+    border-top: 1px solid rgba(18, 18, 18, .18);
+    padding-top: .5rem;
+    margin-top: auto;
+}
+
+.norm-edit summary {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    min-height: 40px;
+    font-weight: 700;
+    cursor: pointer;
+    list-style: none;
+}
+
+.norm-edit summary::-webkit-details-marker {
+    display: none;
+}
+
+.norm-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+    padding-top: .5rem;
+}
+
+.norm-field {
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    background: var(--fr-on-accent);
+    border-radius: 12px;
+    padding: 0 .75rem;
+    min-height: 44px;
+    color: var(--fr-muted);
+    font-weight: 600;
+}
+
+.norm-input {
+    width: 4.5rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--fr-text);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.norm-save {
+    background: var(--fr-on-accent);
+    color: var(--fr-accent);
+    border: none;
+    border-radius: 999px;
+    padding: .625rem 1rem;
+    min-height: 44px;
+    font-weight: 700;
+}
+
+.undo-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .75rem 1rem;
+    background: rgba(211, 242, 58, .10);
+    border: 1px solid rgba(211, 242, 58, .35);
+    border-radius: 16px;
+    padding: .875rem 1rem;
+}
+
+.undo-icon {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    border-radius: 50%;
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }

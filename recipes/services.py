@@ -2,7 +2,7 @@ from dataclasses import dataclass, field
 
 from django.db.models import Sum
 
-from fridge.models import FridgeItem
+from fridge.models import FridgeItem, Product
 
 from .models import Recipe
 
@@ -146,14 +146,47 @@ def missing_products(matches, limit=10):
 
 def write_off(user, product, quantity):
     remaining = quantity
+    taken = []
     items = FridgeItem.objects.select_for_update().filter(user=user, product=product).order_by("added_at")
     for item in items:
         if remaining <= EPSILON:
             break
         used = min(item.quantity, remaining)
+        taken.append({
+            "product": product.pk,
+            "quantity": used,
+            "expiry_date": item.expiry_date.isoformat() if item.expiry_date else None,
+        })
         item.quantity -= used
         remaining -= used
         if item.quantity <= EPSILON:
             item.delete()
         else:
             item.save(update_fields=["quantity"])
+    return taken
+
+
+def restore(user, written_off):
+    products = Product.objects.in_bulk({row["product"] for row in written_off})
+    FridgeItem.objects.bulk_create([
+        FridgeItem(
+            user=user,
+            product=products[row["product"]],
+            quantity=row["quantity"],
+            expiry_date=row["expiry_date"],
+        )
+        for row in written_off
+        if row["product"] in products
+    ])
+
+
+def written_off_summary(written_off):
+    totals = {}
+    for row in written_off:
+        totals[row["product"]] = totals.get(row["product"], 0) + row["quantity"]
+    products = Product.objects.in_bulk(totals)
+    return ", ".join(
+        f"{products[pk].name} {round(quantity, 2):g} {products[pk].get_default_unit_display()}"
+        for pk, quantity in totals.items()
+        if pk in products
+    )

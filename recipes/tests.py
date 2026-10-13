@@ -1,6 +1,11 @@
+from datetime import date, timedelta
+
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+
+from accounts.models import Profile
 
 from fridge.models import FridgeItem, Product
 
@@ -280,9 +285,9 @@ class ServingsTests(RecipeTestMixin, TestCase):
 
         response = self.cook(servings=3, eaten=2)
 
-        self.assertRedirects(response, reverse("recipes:log"))
-        self.assertEqual(FridgeItem.objects.get(product=self.eggs).quantity, 1)
         log = CookingLog.objects.get()
+        self.assertRedirects(response, f"{reverse('recipes:log')}?cooked={log.pk}")
+        self.assertEqual(FridgeItem.objects.get(product=self.eggs).quantity, 1)
         self.assertEqual(log.servings, 2)
         self.assertEqual(log.calories_consumed, 286)
         self.assertContains(self.client.get(reverse("recipes:log")), "2 порції")
@@ -311,3 +316,106 @@ class ServingsTests(RecipeTestMixin, TestCase):
         log = CookingLog.objects.get()
         self.assertEqual(log.servings, 1)
         self.assertEqual(log.calories_consumed, 143)
+
+
+class UndoCookTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.recipe = self.make_recipe()
+        self.client.force_login(self.owner)
+        self.expiry = date(2030, 1, 1)
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=1, expiry_date=self.expiry)
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=5)
+
+    def cook(self):
+        response = self.client.post(reverse("recipes:cook", args=[self.recipe.pk]))
+        return CookingLog.objects.get(), response
+
+    def test_cook_remembers_written_off_batches(self):
+        log, response = self.cook()
+
+        self.assertEqual(log.written_off, [
+            {"product": self.eggs.pk, "quantity": 1, "expiry_date": "2030-01-01"},
+            {"product": self.eggs.pk, "quantity": 1, "expiry_date": None},
+        ])
+        page = self.client.get(response.url)
+        self.assertContains(page, "Записано: Яєчня, 1 порція")
+        self.assertContains(page, "Яйце 2 шт")
+        self.assertContains(page, reverse("recipes:undo_cook", args=[log.pk]))
+
+    def test_undo_returns_products(self):
+        log, _ = self.cook()
+
+        response = self.client.post(reverse("recipes:undo_cook", args=[log.pk]), follow=True)
+
+        self.assertRedirects(response, reverse("recipes:log"))
+        self.assertContains(response, "Запис скасовано")
+        self.assertFalse(CookingLog.objects.exists())
+        items = FridgeItem.objects.filter(product=self.eggs)
+        self.assertEqual(sum(item.quantity for item in items), 6)
+        self.assertTrue(items.filter(quantity=1, expiry_date=self.expiry).exists())
+
+    def test_undo_expires_after_30_minutes(self):
+        log, _ = self.cook()
+        CookingLog.objects.filter(pk=log.pk).update(cooked_at=timezone.now() - timedelta(minutes=31))
+
+        response = self.client.post(reverse("recipes:undo_cook", args=[log.pk]), follow=True)
+
+        self.assertContains(response, "лише протягом 30 хвилин")
+        self.assertTrue(CookingLog.objects.exists())
+        self.assertNotContains(response, reverse("recipes:undo_cook", args=[log.pk]))
+
+    def test_old_logs_without_details_cannot_be_undone(self):
+        log = CookingLog.objects.create(user=self.owner, recipe=self.recipe, calories_consumed=143)
+
+        self.client.post(reverse("recipes:undo_cook", args=[log.pk]))
+
+        self.assertTrue(CookingLog.objects.filter(pk=log.pk).exists())
+
+    def test_cannot_undo_foreign_log(self):
+        log, _ = self.cook()
+        self.client.force_login(self.stranger)
+
+        response = self.client.post(reverse("recipes:undo_cook", args=[log.pk]))
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(CookingLog.objects.exists())
+
+
+class DailyCaloriesTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.owner)
+        self.url = reverse("recipes:log")
+
+    def test_default_norm_and_progress(self):
+        CookingLog.objects.create(user=self.owner, calories_consumed=1500)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.context["norm"], 2000)
+        self.assertEqual(response.context["progress"], 75)
+        self.assertContains(response, "залишилось 500 ккал")
+
+    def test_over_norm(self):
+        CookingLog.objects.create(user=self.owner, calories_consumed=2300)
+
+        response = self.client.get(self.url)
+
+        self.assertTrue(response.context["over_norm"])
+        self.assertEqual(response.context["progress"], 100)
+        self.assertContains(response, "понад норму на 300")
+        self.assertTrue(response.context["week_days"][-1]["over"])
+
+    def test_change_norm(self):
+        response = self.client.post(reverse("recipes:daily_calories"), {"daily_calories": 1800}, follow=True)
+
+        self.assertEqual(Profile.objects.get(user=self.owner).daily_calories, 1800)
+        self.assertContains(response, "Денну норму змінено на 1800 ккал")
+        self.assertEqual(response.context["norm"], 1800)
+
+    def test_invalid_norm(self):
+        response = self.client.post(reverse("recipes:daily_calories"), {"daily_calories": 100}, follow=True)
+
+        self.assertContains(response, "не менше 800")
+        self.assertEqual(Profile.for_user(self.owner).daily_calories, 2000)

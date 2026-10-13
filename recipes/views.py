@@ -13,6 +13,8 @@ from django.utils import timezone
 from django.views import View
 from django.views.generic import DeleteView, DetailView, FormView, ListView, TemplateView
 
+from accounts.forms import DailyCaloriesForm
+from accounts.models import Profile
 from fridge.models import FridgeItem, Product
 
 from .forms import UNIT_LABELS, ImportedIngredientFormSet, ImportedRecipeForm, RecipeImportForm
@@ -30,7 +32,9 @@ from .services import (
     max_servings,
     missing_products,
     parse_servings,
+    restore,
     write_off,
+    written_off_summary,
 )
 
 LIGHT_CALORIES = 500
@@ -203,21 +207,42 @@ class CookRecipeView(LoginRequiredMixin, View):
             return redirect(detail_url)
 
         with transaction.atomic():
-            CookingLog.objects.create(
+            taken = []
+            for ingredient in match.required:
+                if ingredient.needed is not None:
+                    taken += write_off(request.user, ingredient.product, ingredient.needed)
+            log = CookingLog.objects.create(
                 user=request.user,
                 recipe=recipe,
                 servings=eaten,
                 calories_consumed=match.nutrition["calories"] * eaten,
+                written_off=taken,
             )
-            used = [ingredient for ingredient in match.required if ingredient.needed is not None]
-            for ingredient in used:
-                write_off(request.user, ingredient.product, ingredient.needed)
+        return redirect(f"{reverse('recipes:log')}?cooked={log.pk}")
 
-        written_off = ", ".join(
-            f"{round(ingredient.needed, 2):g} {ingredient.product.get_default_unit_display()} {ingredient.product.name}"
-            for ingredient in used
-        )
-        messages.success(request, f"Записано! З холодильника списано: {written_off}")
+
+class UndoCookView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        with transaction.atomic():
+            log = get_object_or_404(CookingLog.objects.select_for_update(), pk=pk, user=request.user)
+            if not log.can_undo():
+                messages.error(request, "Скасувати можна лише протягом 30 хвилин після готування.")
+                return redirect("recipes:log")
+            summary = written_off_summary(log.written_off)
+            restore(request.user, log.written_off)
+            log.delete()
+        messages.success(request, f"Запис скасовано. У холодильник повернулися: {summary}.")
+        return redirect("recipes:log")
+
+
+class DailyCaloriesView(LoginRequiredMixin, View):
+    def post(self, request):
+        form = DailyCaloriesForm(request.POST, instance=Profile.for_user(request.user))
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Денну норму змінено на {form.instance.daily_calories} ккал.")
+        else:
+            messages.error(request, " ".join(form.errors["daily_calories"]))
         return redirect("recipes:log")
 
 
@@ -229,7 +254,15 @@ class CookingLogListView(LoginRequiredMixin, ListView):
         logs = list(CookingLog.objects.filter(user=self.request.user).select_related("recipe")[:LOG_LIMIT])
         for log in logs:
             log.local_date = timezone.localdate(log.cooked_at)
+            log.undoable = log.can_undo()
         return logs
+
+    def cooked_log(self, logs):
+        pk = self.request.GET.get("cooked", "")
+        log = next((log for log in logs if str(log.pk) == pk and log.undoable), None)
+        if log:
+            log.summary = written_off_summary(log.written_off)
+        return log
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -255,19 +288,30 @@ class CookingLogListView(LoginRequiredMixin, ListView):
                 "is_today": day == today,
             })
 
-        peak = max(day["total"] for day in days)
+        profile = Profile.for_user(self.request.user)
+        norm = profile.daily_calories
+        top = max(norm, *(day["total"] for day in days))
         for day in days:
-            day["height"] = round(day["total"] / peak * 100) if peak else 0
+            day["height"] = round(day["total"] / top * 100)
+            day["over"] = day["total"] > norm
 
         week_total = sum(day["total"] for day in days)
+        today_total = days[-1]["total"]
         context.update({
             "today": today,
             "yesterday": today - timedelta(days=1),
-            "today_total": days[-1]["total"],
+            "today_total": today_total,
             "today_dishes": by_day.get(today, {}).get("dishes", 0),
+            "norm": norm,
+            "norm_form": DailyCaloriesForm(instance=profile),
+            "norm_line": round(norm / top * 100),
+            "progress": min(100, round(today_total / norm * 100)),
+            "over_norm": today_total > norm,
+            "left": abs(norm - today_total),
             "week_days": days,
             "week_total": week_total,
             "week_average": round(week_total / 7),
+            "cooked_log": self.cooked_log(context["logs"]),
         })
         return context
 

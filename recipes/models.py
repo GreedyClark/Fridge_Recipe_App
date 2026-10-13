@@ -1,11 +1,15 @@
+from datetime import timedelta
 from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.validators import MinValueValidator
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
 
 from fridge.models import Product
+
+UNDO_WINDOW = timedelta(minutes=30)
 
 NUTRIENT_FIELDS = {
     "calories": "calories_per_100",
@@ -130,6 +134,7 @@ class CookingLog(models.Model):
     cooked_at = models.DateTimeField("приготовано", auto_now_add=True)
     calories_consumed = models.FloatField("калорії")
     servings = models.PositiveSmallIntegerField("порцій", default=1)
+    written_off = models.JSONField("списано", default=list, blank=True)
 
     class Meta:
         ordering = ["-cooked_at"]
@@ -139,6 +144,17 @@ class CookingLog(models.Model):
     def __str__(self):
         name = self.recipe.name if self.recipe else "Видалений рецепт"
         return f"{name} — {self.calories_consumed:g} ккал"
+
+    @property
+    def undo_deadline(self):
+        return self.cooked_at + UNDO_WINDOW
+
+    def can_undo(self):
+        return bool(self.written_off) and timezone.now() < self.undo_deadline
+
+    def minutes_left(self):
+        seconds = (self.undo_deadline - timezone.now()).total_seconds()
+        return max(1, int(seconds // 60))
 
 
 class RecipeImport(models.Model):

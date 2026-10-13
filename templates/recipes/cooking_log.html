@@ -9,12 +9,44 @@
     <h1 class="page-title">Журнал</h1>
 </div>
 
+{% if cooked_log %}
+    <div class="undo-banner mb-4" role="status">
+        <span class="undo-icon"><i class="ti ti-check"></i></span>
+        <div class="flex-grow-1">
+            <div class="fw-bold">Записано: {% if cooked_log.recipe %}{{ cooked_log.recipe.name }}{% else %}страва{% endif %}, {{ cooked_log.servings }} {{ cooked_log.servings|uk_plural:"порція,порції,порцій" }}</div>
+            <div class="text-secondary small">З холодильника списано: {{ cooked_log.summary }}. Скасувати можна ще {{ cooked_log.minutes_left }} хв.</div>
+        </div>
+        <form method="post" action="{% url 'recipes:undo_cook' cooked_log.pk %}" class="m-0">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-arrow-back-up"></i>Скасувати</button>
+        </form>
+    </div>
+{% endif %}
+
 <div class="row g-3 mb-4">
     <div class="col-lg-4">
         <div class="today-card h-100">
             <div class="today-label">Сьогодні</div>
-            <div class="today-value">{{ today_total|floatformat:"0g" }}</div>
-            <div class="fw-bold fs-5">ккал · {{ today_dishes }} {{ today_dishes|uk_plural:"страва,страви,страв" }}</div>
+            <div class="d-flex flex-wrap align-items-baseline gap-2">
+                <span class="today-value">{{ today_total|floatformat:"0g" }}</span>
+                <span class="today-norm">/ {{ norm|floatformat:"0g" }}</span>
+            </div>
+            <div class="today-progress{% if over_norm %} over{% endif %}" role="progressbar" aria-label="Калорії за сьогодні" aria-valuemin="0" aria-valuemax="{{ norm }}" aria-valuenow="{{ today_total }}">
+                <div class="today-progress-fill" style="width: {{ progress }}%"></div>
+            </div>
+            <div class="d-flex justify-content-between gap-2 fw-bold">
+                <span>{{ today_dishes }} {{ today_dishes|uk_plural:"страва,страви,страв" }}</span>
+                <span>{% if over_norm %}понад норму на {{ left|floatformat:"0g" }}{% else %}залишилось {{ left|floatformat:"0g" }} ккал{% endif %}</span>
+            </div>
+            <details class="norm-edit">
+                <summary><i class="ti ti-pencil"></i>Норма: {{ norm|floatformat:"0g" }} ккал · змінити</summary>
+                <form method="post" action="{% url 'recipes:daily_calories' %}" class="norm-form">
+                    {% csrf_token %}
+                    <label for="{{ norm_form.daily_calories.id_for_label }}" class="fw-bold">Денна норма</label>
+                    <span class="norm-field">{{ norm_form.daily_calories }}<span>ккал</span></span>
+                    <button type="submit" class="norm-save">Зберегти</button>
+                </form>
+            </details>
         </div>
     </div>
     <div class="col-lg-8">
@@ -25,18 +57,30 @@
                         <div class="page-label">За останні 7 днів</div>
                         <div class="display-num week-total">{{ week_total|floatformat:"0g" }} <small class="text-secondary">ккал</small></div>
                     </div>
-                    <div class="text-secondary fw-semibold">у середньому {{ week_average|floatformat:"0g" }} ккал на день</div>
+                    <div class="d-flex flex-column align-items-sm-end gap-1 text-secondary fw-semibold">
+                        <span>у середньому {{ week_average|floatformat:"0g" }} ккал на день</span>
+                        <span class="week-legend"><span class="legend-line"></span>норма {{ norm|floatformat:"0g" }}<span class="legend-over"></span>понад норму</span>
+                    </div>
                 </div>
-                <div class="week-chart" role="img" aria-label="Калорії за останні 7 днів">
-                    {% for day in week_days %}
-                        <div class="week-bar{% if day.is_today %} is-today{% endif %}">
-                            <span class="week-bar-value">{% if day.total %}{{ day.total }}{% endif %}</span>
+                <div class="week-chart" role="img" aria-label="Калорії за останні 7 днів, норма {{ norm }} ккал">
+                    <div class="week-row">
+                        {% for day in week_days %}
+                            <span class="week-bar-value{% if day.is_today %} is-today{% endif %}{% if day.over %} over{% endif %}">{% if day.total %}{{ day.total }}{% endif %}</span>
+                        {% endfor %}
+                    </div>
+                    <div class="week-row week-tracks">
+                        <div class="week-norm" style="bottom: {{ norm_line }}%"></div>
+                        {% for day in week_days %}
                             <div class="week-bar-track">
-                                <div class="week-bar-fill" style="height: {{ day.height }}%"></div>
+                                <div class="week-bar-fill{% if day.is_today %} is-today{% endif %}{% if day.over %} over{% endif %}" style="height: {{ day.height }}%"></div>
                             </div>
-                            <span class="week-bar-label">{{ day.label }}</span>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
+                    <div class="week-row">
+                        {% for day in week_days %}
+                            <span class="week-bar-label{% if day.is_today %} is-today{% endif %}">{{ day.label }}</span>
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>
@@ -69,6 +113,12 @@
                                     {% endif %}
                                     <div class="text-secondary small">{{ log.cooked_at|time:"H:i" }}{% if log.servings > 1 %} · {{ log.servings }} {{ log.servings|uk_plural:"порція,порції,порцій" }}{% endif %}</div>
                                 </div>
+                                {% if log.undoable %}
+                                    <form method="post" action="{% url 'recipes:undo_cook' log.pk %}" class="m-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-ghost btn-sm" aria-label="Скасувати запис"><i class="ti ti-arrow-back-up"></i><span class="d-none d-sm-inline">Скасувати</span></button>
+                                    </form>
+                                {% endif %}
                                 <div class="fw-bold text-nowrap">{{ log.calories_consumed|floatformat:"0g" }} <span class="text-secondary fw-semibold">ккал</span></div>
                             </div>
                         {% endfor %}

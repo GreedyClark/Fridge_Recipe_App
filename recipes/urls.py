@@ -16,4 +16,6 @@ urlpatterns = [
     path("drafts/", views.SharedDraftListView.as_view(), name="drafts"),
     path("drafts/<int:pk>/reject/", views.RejectDraftView.as_view(), name="reject_draft"),
     path("log/", views.CookingLogListView.as_view(), name="log"),
+    path("log/<int:pk>/undo/", views.UndoCookView.as_view(), name="undo_cook"),
+    path("log/norm/", views.DailyCaloriesView.as_view(), name="daily_calories"),
 ]
