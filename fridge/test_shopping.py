@@ -135,3 +135,14 @@ class ShoppingTests(TestCase):
         self.assertContains(response, "Додано в список покупок: Яйце")
         item = ShoppingItem.objects.get()
         self.assertEqual((item.product, item.quantity, item.source), (self.eggs, 3, "для: Омлет"))
+
+
+class ErrorPageTests(TestCase):
+    def test_custom_404(self):
+        user = User.objects.create_user("cook", password="pass")
+        self.client.force_login(user)
+
+        response = self.client.get("/no-such-page/")
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, "Сторінку не знайдено", status_code=404)

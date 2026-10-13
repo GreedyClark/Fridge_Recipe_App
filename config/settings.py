@@ -10,6 +10,7 @@ config = AutoConfig(search_path=str(BASE_DIR))
 SECRET_KEY = config("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="127.0.0.1,localhost", cast=Csv())
+CSRF_TRUSTED_ORIGINS = config("CSRF_TRUSTED_ORIGINS", default="", cast=Csv())
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -75,6 +76,7 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
@@ -93,3 +95,16 @@ GEMINI_MODEL = config("GEMINI_MODEL", default="")
 GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="", cast=Csv())
 THEMEALDB_API_KEY = config("THEMEALDB_API_KEY", default="1")
 IMPORTS_PER_DAY = config("IMPORTS_PER_DAY", default=20, cast=int)
+
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=0, cast=int)
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {"console": {"class": "logging.StreamHandler"}},
+    "loggers": {"django": {"handlers": ["console"], "level": "WARNING"}},
+}

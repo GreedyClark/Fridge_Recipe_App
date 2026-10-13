@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block title %}Сторінку не знайдено · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-body empty-state">
+        <span class="empty-icon"><i class="ti ti-search"></i></span>
+        <h1 class="h3 mb-0">Сторінку не знайдено</h1>
+        <p class="text-secondary mb-0">Можливо, її видалили або посилання з помилкою.</p>
+        <a href="{% url 'fridge:list' %}" class="btn btn-primary">До холодильника</a>
+    </div>
+</div>
+{% endblock %}

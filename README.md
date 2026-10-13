@@ -140,6 +140,32 @@ python manage.py import_themealdb --limit 5 --category Breakfast # лише сн
 
 Застосунок відкриється на http://127.0.0.1:8000/, адмінка — на `/admin/`.
 
+## Деплой на PythonAnywhere
+
+Застосунок працює на безкоштовному тарифі PythonAnywhere (Python 3.13, SQLite). Gemini й USDA є в списку дозволених адрес безкоштовного тарифу.
+
+1. **Bash-консоль:**
+   ```bash
+   git clone https://github.com/GreedyClark/Fridge_Recipe_App.git
+   cd Fridge_Recipe_App
+   python3.13 -m venv venv
+   source venv/bin/activate
+   pip install -r requirements.txt
+   ```
+2. **`.env`** — як локально, але `DEBUG=False`, `ALLOWED_HOSTS=<логін>.pythonanywhere.com`, `CSRF_TRUSTED_ORIGINS=https://<логін>.pythonanywhere.com` і новий `SECRET_KEY`.
+3. **База й статика:**
+   ```bash
+   python manage.py migrate
+   python manage.py collectstatic --noinput
+   ```
+4. **Вкладка Web** → Add a new web app → Manual configuration → Python 3.13:
+   - Virtualenv: `/home/<логін>/Fridge_Recipe_App/venv`
+   - WSGI-файл: шлях до проєкту в `sys.path` і `DJANGO_SETTINGS_MODULE = "config.settings"`
+   - Static files: `/static/` → `/home/<логін>/Fridge_Recipe_App/staticfiles`, `/media/` → `/home/<логін>/Fridge_Recipe_App/media`
+   - Force HTTPS: увімкнути, потім Reload
+
+Оновлення після нових комітів: `git pull`, `migrate`, `collectstatic`, Reload. Безкоштовний сайт треба продовжувати раз на місяць кнопкою на вкладці Web.
+
 ## Джерело даних
 
 Частина спільних рецептів і їхні фото взяті з [TheMealDB](https://www.themealdb.com/) — відкритої бази рецептів. Тексти перекладено й перевірено вручну перед публікацією; на сторінці кожного такого рецепта є посилання на оригінал. Калорійність і БЖУ продуктів — з [USDA FoodData Central](https://fdc.nal.usda.gov/).
