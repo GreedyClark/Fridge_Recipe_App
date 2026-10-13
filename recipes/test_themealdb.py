@@ -5,11 +5,14 @@ from django.contrib.auth.models import User
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import SimpleTestCase, TestCase
+from django.urls import reverse
+
+from fridge.models import Product
 
 from .importing.errors import ImportFailed, QuotaExceeded
 from .importing.gemini import build_prompt
 from .importing.themealdb import iter_meals, meal_to_raw
-from .models import RecipeImport
+from .models import Recipe, RecipeImport
 
 COMMAND = "recipes.management.commands.import_themealdb"
 
@@ -154,3 +157,168 @@ class ImportCommandTests(TestCase):
 
         with self.assertRaises(CommandError):
             self.run_command()
+
+
+class SharedDraftTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user("admin", password="pass", is_staff=True)
+        self.importer = User.objects.create_user("bot", password="pass", is_staff=True)
+        self.cook = User.objects.create_user("cook", password="pass")
+        self.buckwheat = Product.objects.create(name="Гречка", default_unit="g", calories_per_100=346)
+        self.private = Product.objects.create(name="Мій соус", default_unit="g", calories_per_100=100, owner=self.admin)
+        self.draft = RecipeImport.objects.create(
+            user=self.importer,
+            url="https://www.themealdb.com/meal/1",
+            external_id="themealdb:1",
+            data={
+                "name": "Гречка з борошном",
+                "original_name": "Buckwheat",
+                "meal_type": "lunch",
+                "servings": 2,
+                "steps": ["Зварити гречку."],
+                "ingredients": [
+                    {"original": "200g Buckwheat", "product_id": self.buckwheat.pk, "new_product_name": "",
+                     "usda_query": "", "unit": "g", "quantity": 200.0, "grams_per_piece": None,
+                     "optional": False, "warning": ""},
+                    {"original": "100g Flour", "product_id": None, "new_product_name": "Борошно",
+                     "usda_query": "Wheat flour", "unit": "g", "quantity": 100.0, "grams_per_piece": None,
+                     "optional": False, "warning": "Перевір кількість"},
+                ],
+                "image_url": "https://www.themealdb.com/images/1.jpg",
+                "source_url": "https://www.themealdb.com/meal/1",
+            },
+        )
+        self.review_url = reverse("recipes:import_review", args=[self.draft.pk])
+
+    def form_data(self, **changes):
+        data = {
+            "name": "Гречка з борошном",
+            "meal_type": "lunch",
+            "servings": "2",
+            "steps": ["Зварити гречку."],
+            "ingredients-TOTAL_FORMS": "2",
+            "ingredients-INITIAL_FORMS": "2",
+            "ingredients-MIN_NUM_FORMS": "0",
+            "ingredients-MAX_NUM_FORMS": "1000",
+            "ingredients-0-product": str(self.buckwheat.pk),
+            "ingredients-0-quantity": "200",
+            "ingredients-1-product": "",
+            "ingredients-1-new_product_name": "Борошно",
+            "ingredients-1-usda_query": "Wheat flour",
+            "ingredients-1-new_unit": "g",
+            "ingredients-1-quantity": "100",
+        }
+        data.update(changes)
+        return data
+
+    def fake_import(self, name, query, unit, grams_per_piece=None, owner=None, **kwargs):
+        product = Product.objects.create(name=name, default_unit=unit, calories_per_100=364, owner=owner)
+        return product, True, {}
+
+    def test_drafts_page_for_staff(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(reverse("recipes:drafts"))
+
+        self.assertContains(response, "Гречка з борошном")
+        self.assertContains(response, "Оригінал: Buckwheat")
+        self.assertContains(response, "Перевір 1 рядок")
+        self.assertContains(response, "1 чернетка")
+
+    def test_drafts_page_forbidden_for_users(self):
+        self.client.force_login(self.cook)
+
+        self.assertEqual(self.client.get(reverse("recipes:drafts")).status_code, 403)
+        self.assertEqual(self.client.get(self.review_url).status_code, 404)
+
+    def test_drafts_button_only_for_staff(self):
+        self.client.force_login(self.admin)
+        self.assertContains(self.client.get(reverse("recipes:list")), reverse("recipes:drafts"))
+
+        self.client.force_login(self.cook)
+        self.assertNotContains(self.client.get(reverse("recipes:list")), reverse("recipes:drafts"))
+
+    def test_review_offers_shared_catalog_only(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.get(self.review_url)
+
+        self.assertContains(response, "Спільний рецепт")
+        self.assertContains(response, 'name="shared"')
+        self.assertContains(response, "checked")
+        self.assertNotContains(response, "Мій соус")
+
+    @patch("recipes.importing.save.import_product")
+    def test_saves_shared_recipe(self, import_product):
+        import_product.side_effect = self.fake_import
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.review_url, self.form_data(shared="on"))
+
+        recipe = Recipe.objects.get()
+        self.assertRedirects(response, reverse("recipes:detail", args=[recipe.pk]))
+        self.assertIsNone(recipe.owner)
+        self.assertIsNone(Product.objects.get(name="Борошно").owner)
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.status, RecipeImport.SAVED)
+
+        self.client.force_login(self.cook)
+        detail = self.client.get(reverse("recipes:detail", args=[recipe.pk]))
+        self.assertContains(detail, "Дані й фото:")
+        self.assertContains(detail, "TheMealDB")
+
+    @patch("recipes.importing.save.import_product")
+    def test_unchecked_shared_saves_private(self, import_product):
+        import_product.side_effect = self.fake_import
+        self.client.force_login(self.admin)
+
+        self.client.post(self.review_url, self.form_data())
+
+        self.assertEqual(Recipe.objects.get().owner, self.importer)
+
+    def test_private_product_rejected_in_shared_draft(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.review_url, self.form_data(**{"ingredients-0-product": str(self.private.pk)}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Recipe.objects.exists())
+
+    @patch("recipes.importing.save.import_product")
+    def test_users_cannot_share(self, import_product):
+        import_product.side_effect = self.fake_import
+        record = RecipeImport.objects.create(user=self.cook, url="https://example.com/r/", data=self.draft.data)
+        self.client.force_login(self.cook)
+
+        page = self.client.get(reverse("recipes:import_review", args=[record.pk]))
+        self.client.post(reverse("recipes:import_review", args=[record.pk]), self.form_data(shared="on"))
+
+        self.assertNotContains(page, "Спільний рецепт")
+        self.assertEqual(Recipe.objects.get().owner, self.cook)
+
+    def test_reject_draft(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(reverse("recipes:reject_draft", args=[self.draft.pk]))
+
+        self.assertRedirects(response, reverse("recipes:drafts"))
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.status, RecipeImport.REJECTED)
+        self.assertNotContains(self.client.get(reverse("recipes:drafts")), "Гречка з борошном")
+
+    def test_reject_forbidden_for_users(self):
+        self.client.force_login(self.cook)
+
+        response = self.client.post(reverse("recipes:reject_draft", args=[self.draft.pk]))
+
+        self.assertEqual(response.status_code, 403)
+        self.draft.refresh_from_db()
+        self.assertEqual(self.draft.status, RecipeImport.DRAFT)
+
+    def test_no_attribution_for_other_sources(self):
+        recipe = Recipe.objects.create(name="Каша", instructions="Зварити", source_url="https://example.com/k/")
+        self.client.force_login(self.cook)
+
+        response = self.client.get(reverse("recipes:detail", args=[recipe.pk]))
+
+        self.assertNotContains(response, "Дані й фото:")

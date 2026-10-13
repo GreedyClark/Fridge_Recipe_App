@@ -13,5 +13,7 @@ urlpatterns = [
     path("what-can-i-cook/", views.WhatCanICookView.as_view(), name="what_can_i_cook"),
     path("import/", views.RecipeImportView.as_view(), name="import"),
     path("import/<int:pk>/", views.ImportReviewView.as_view(), name="import_review"),
+    path("drafts/", views.SharedDraftListView.as_view(), name="drafts"),
+    path("drafts/<int:pk>/reject/", views.RejectDraftView.as_view(), name="reject_draft"),
     path("log/", views.CookingLogListView.as_view(), name="log"),
 ]

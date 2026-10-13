@@ -32,6 +32,9 @@
                     БЖУ розраховано з даних USDA
                 </p>
             {% endwith %}
+            {% if recipe.from_themealdb %}
+                <p class="attribution mt-2 mb-0"><i class="ti ti-database"></i>Дані й фото: <a href="{{ recipe.source_url }}" target="_blank" rel="noopener">TheMealDB</a></p>
+            {% endif %}
         </div>
 
         <div class="row row-cols-2 row-cols-md-4 g-3">

@@ -36,8 +36,9 @@ def resolve_products(rows, owner):
     return products
 
 
-def save_import(record, recipe_data, rows, steps):
-    products = resolve_products(rows, record.user)
+def save_import(record, recipe_data, rows, steps, shared=False):
+    owner = None if shared else record.user
+    products = resolve_products(rows, owner)
 
     with transaction.atomic():
         record = RecipeImport.objects.select_for_update().get(pk=record.pk)
@@ -45,7 +46,7 @@ def save_import(record, recipe_data, rows, steps):
             raise ImportFailed("Цей рецепт уже збережено.")
 
         recipe = Recipe.objects.create(
-            owner=record.user,
+            owner=owner,
             name=recipe_data["name"],
             meal_type=recipe_data.get("meal_type", ""),
             servings=recipe_data["servings"],

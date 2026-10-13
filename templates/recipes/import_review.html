@@ -7,7 +7,11 @@
 {% endblock %}
 
 {% block content %}
-<a href="{% url 'recipes:import' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>Інше посилання</a>
+{% if record.external_id %}
+    <a href="{% url 'recipes:drafts' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>До чернеток</a>
+{% else %}
+    <a href="{% url 'recipes:import' %}" class="btn btn-ghost mb-4"><i class="ti ti-arrow-left"></i>Інше посилання</a>
+{% endif %}
 
 <div class="mb-4">
     <div class="page-label">Імпорт · {{ source_domain }}</div>

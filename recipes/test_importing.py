@@ -337,7 +337,9 @@ class GeminiParsingTests(TestCase):
     def test_meal_type_in_draft(self):
         ingredients = [{"original": "гречка", "product_id": self.buckwheat.pk, "unit": "g", "quantity": 100}]
         client = self.gemini_returns(self.payload(ingredients, meal_type="breakfast"))
-        self.assertEqual(parse_recipe(self.raw, client=client)["meal_type"], "breakfast")
+        draft = parse_recipe(self.raw, client=client)
+        self.assertEqual(draft["meal_type"], "breakfast")
+        self.assertEqual(draft["original_name"], self.raw.title)
 
         client = self.gemini_returns(self.payload(ingredients))
         self.assertEqual(parse_recipe(self.raw, client=client)["meal_type"], "")

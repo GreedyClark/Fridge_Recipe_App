@@ -10,8 +10,13 @@
     <div class="card-body p-4 d-flex flex-column gap-3">
         <a href="{{ source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ source_domain }}</a>
         <div class="d-flex gap-2 text-secondary small">
-            <i class="ti ti-lock text-accent"></i>
-            <span>Рецепт бачиш лише ти. Фото не копіюємо, а показуємо з сайту-джерела.</span>
+            {% if record.external_id %}
+                <i class="ti ti-database text-accent"></i>
+                <span>Чернетка з TheMealDB. Продукти підбираються лише зі спільного довідника.</span>
+            {% else %}
+                <i class="ti ti-lock text-accent"></i>
+                <span>Рецепт бачиш лише ти. Фото не копіюємо, а показуємо з сайту-джерела.</span>
+            {% endif %}
         </div>
         <div>
             <label for="{{ recipe_form.image.id_for_label }}" class="form-label">Своє фото <span class="text-secondary fw-normal">(необов'язково)</span></label>

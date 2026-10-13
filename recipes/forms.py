@@ -48,6 +48,16 @@ class ImportedRecipeForm(forms.Form):
         required=False,
         widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": "image/*"}),
     )
+    shared = forms.BooleanField(
+        label="Спільний рецепт",
+        required=False,
+        widget=forms.CheckboxInput(attrs={"class": "shared-check"}),
+    )
+
+    def __init__(self, *args, allow_shared=False, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not allow_shared:
+            del self.fields["shared"]
 
 
 class ImportedIngredientForm(forms.Form):

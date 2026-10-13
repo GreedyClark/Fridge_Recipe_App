@@ -215,6 +215,7 @@ def build_draft(parsed, raw, products):
     servings = parsed.servings if 1 <= parsed.servings <= MAX_SERVINGS else 1
     return {
         "name": (parsed.name.strip() or raw.title)[:150],
+        "original_name": raw.title,
         "meal_type": parsed.meal_type or "",
         "servings": servings,
         "steps": [step.strip() for step in parsed.steps if step.strip()],

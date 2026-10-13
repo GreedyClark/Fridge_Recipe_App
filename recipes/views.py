@@ -3,9 +3,9 @@ from urllib.parse import urlencode, urlparse
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Count, Q, Sum
 from django.db.models.functions import TruncDate
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -86,6 +86,17 @@ def meal_tabs(matches, active, **params):
     ]
 
 
+def reviewable_imports(user):
+    imports = RecipeImport.objects.filter(status=RecipeImport.DRAFT)
+    if user.is_staff:
+        return imports.filter(Q(user=user) | ~Q(external_id=""))
+    return imports.filter(user=user)
+
+
+def shared_drafts():
+    return RecipeImport.objects.filter(status=RecipeImport.DRAFT).exclude(external_id="")
+
+
 def matches_query(match, query):
     names = [match.recipe.name] + [ingredient.product.name for ingredient in match.ingredients]
     return any(query in name.casefold() for name in names)
@@ -121,6 +132,8 @@ class RecipeListView(LoginRequiredMixin, TemplateView):
         context["query"] = query
         context["active_filter"] = active
         context["active_meal"] = meal
+        if user.is_staff:
+            context["draft_count"] = shared_drafts().count()
         return context
 
 
@@ -302,9 +315,9 @@ def ingredient_initial(row):
     }
 
 
-def bind_editor(request):
-    recipe_form = ImportedRecipeForm(request.POST, request.FILES)
-    formset = ImportedIngredientFormSet(request.POST, prefix="ingredients", form_kwargs={"user": request.user})
+def bind_editor(request, catalog_user, allow_shared=False):
+    recipe_form = ImportedRecipeForm(request.POST, request.FILES, allow_shared=allow_shared)
+    formset = ImportedIngredientFormSet(request.POST, prefix="ingredients", form_kwargs={"user": catalog_user})
     steps = [step.strip() for step in request.POST.getlist("steps") if step.strip()]
 
     recipe_valid = recipe_form.is_valid()
@@ -343,19 +356,28 @@ class ImportReviewView(LoginRequiredMixin, View):
     template_name = "recipes/import_review.html"
 
     def get_record(self):
-        return get_object_or_404(self.request.user.recipe_imports, pk=self.kwargs["pk"], status=RecipeImport.DRAFT)
+        return get_object_or_404(reviewable_imports(self.request.user), pk=self.kwargs["pk"])
+
+    def catalog_user(self, record):
+        return None if record.external_id else self.request.user
 
     def get(self, request, pk):
         record = self.get_record()
         data = record.data
         recipe_form = ImportedRecipeForm(
-            initial={"name": data.get("name"), "meal_type": data.get("meal_type", ""), "servings": data.get("servings")}
+            initial={
+                "name": data.get("name"),
+                "meal_type": data.get("meal_type", ""),
+                "servings": data.get("servings"),
+                "shared": bool(record.external_id),
+            },
+            allow_shared=request.user.is_staff,
         )
         rows = data.get("ingredients", [])
         formset = ImportedIngredientFormSet(
             prefix="ingredients",
             initial=[ingredient_initial(row) for row in rows],
-            form_kwargs={"user": request.user},
+            form_kwargs={"user": self.catalog_user(record)},
         )
         for form, row in zip(formset.forms, rows):
             form.warning = row.get("warning", "")
@@ -363,19 +385,28 @@ class ImportReviewView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         record = self.get_record()
-        recipe_form, formset, steps, valid = bind_editor(request)
+        recipe_form, formset, steps, valid = bind_editor(
+            request, self.catalog_user(record), allow_shared=request.user.is_staff
+        )
         if valid:
+            shared = recipe_form.cleaned_data.get("shared", False)
             recipe = save_editor(
-                lambda data, rows, steps: save_import(record, data, rows, steps), recipe_form, formset, steps
+                lambda data, rows, steps: save_import(record, data, rows, steps, shared=shared),
+                recipe_form,
+                formset,
+                steps,
             )
             if recipe:
-                messages.success(request, f"Рецепт «{recipe.name}» збережено. Його бачиш лише ти.")
+                if shared:
+                    messages.success(request, f"Рецепт «{recipe.name}» додано в спільну базу.")
+                else:
+                    messages.success(request, f"Рецепт «{recipe.name}» збережено. Його бачиш лише ти.")
                 return redirect("recipes:detail", pk=recipe.pk)
         return self.render(record, recipe_form, formset, steps or request.POST.getlist("steps"))
 
     def render(self, record, recipe_form, formset, steps):
         source_url = record.data.get("source_url") or record.url
-        context = editor_context(recipe_form, formset, steps, self.request.user)
+        context = editor_context(recipe_form, formset, steps, self.catalog_user(record))
         context.update({
             "record": record,
             "warning_count": sum(1 for form in formset.forms if form.warning),
@@ -384,9 +415,38 @@ class ImportReviewView(LoginRequiredMixin, View):
             "source_domain": urlparse(source_url).netloc.removeprefix("www."),
             "side_template": "recipes/_import_side.html",
             "submit_label": "Зберегти рецепт",
-            "cancel_url": reverse("recipes:import"),
+            "cancel_url": reverse("recipes:drafts" if record.external_id else "recipes:import"),
         })
         return render(self.request, self.template_name, context)
+
+
+class StaffRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_staff
+
+
+class SharedDraftListView(StaffRequiredMixin, ListView):
+    template_name = "recipes/shared_drafts.html"
+    context_object_name = "drafts"
+
+    def get_queryset(self):
+        drafts = list(shared_drafts().order_by("created_at"))
+        meals = dict(Recipe.MEAL_CHOICES)
+        for draft in drafts:
+            rows = draft.data.get("ingredients", [])
+            draft.ingredient_count = len(rows)
+            draft.warning_count = sum(1 for row in rows if row.get("warning"))
+            draft.meal_label = meals.get(draft.data.get("meal_type"), "")
+        return drafts
+
+
+class RejectDraftView(StaffRequiredMixin, View):
+    def post(self, request, pk):
+        draft = get_object_or_404(shared_drafts(), pk=pk)
+        draft.status = RecipeImport.REJECTED
+        draft.save(update_fields=["status"])
+        messages.info(request, f"Чернетку «{draft.data.get('name', draft.url)}» відхилено.")
+        return redirect("recipes:drafts")
 
 
 class RecipeEditView(LoginRequiredMixin, View):
@@ -414,7 +474,7 @@ class RecipeEditView(LoginRequiredMixin, View):
 
     def post(self, request, pk):
         recipe = self.get_recipe()
-        recipe_form, formset, steps, valid = bind_editor(request)
+        recipe_form, formset, steps, valid = bind_editor(request, request.user)
         if valid:
             saved = save_editor(
                 lambda data, rows, steps: update_recipe(recipe, data, rows, steps), recipe_form, formset, steps

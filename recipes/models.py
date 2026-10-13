@@ -67,6 +67,10 @@ class Recipe(models.Model):
     def source_domain(self):
         return urlparse(self.source_url).netloc.removeprefix("www.")
 
+    @property
+    def from_themealdb(self):
+        return self.source_domain == "themealdb.com"
+
     def photo_url(self):
         if self.image:
             return self.image.url
@@ -140,10 +144,12 @@ class RecipeImport(models.Model):
     DRAFT = "draft"
     SAVED = "saved"
     FAILED = "failed"
+    REJECTED = "rejected"
     STATUS_CHOICES = [
         (DRAFT, "чернетка"),
         (SAVED, "збережено"),
         (FAILED, "помилка"),
+        (REJECTED, "відхилено"),
     ]
 
     user = models.ForeignKey(

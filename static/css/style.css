@@ -1255,3 +1255,53 @@ a.photo-credit:hover {
     letter-spacing: .08em;
     text-transform: uppercase;
 }
+
+.attribution {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--fr-muted);
+    font-size: .875rem;
+}
+
+.attribution a {
+    color: var(--fr-accent);
+    font-weight: 600;
+}
+
+.count-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: var(--fr-surface);
+    border: 1px solid var(--fr-line);
+    border-radius: 999px;
+    padding: .6rem 1rem;
+    font-weight: 700;
+}
+
+.count-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--fr-accent);
+}
+
+.command-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    background: var(--fr-surface-2);
+    color: var(--fr-text);
+    border-radius: 12px;
+    padding: .6rem .9rem;
+    font-size: .875rem;
+}
+
+.shared-check {
+    width: 1.375rem;
+    height: 1.375rem;
+    margin: .1rem 0 0;
+    flex-shrink: 0;
+    accent-color: var(--fr-accent);
+}
