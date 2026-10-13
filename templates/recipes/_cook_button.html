@@ -1,11 +1,24 @@
+{% load recipe_extras %}
 {% if match.status == "ready" %}
-    <form method="post" action="{% url 'recipes:cook' recipe.pk %}" class="m-0">
+    <form method="post" action="{% url 'recipes:cook' recipe.pk %}" class="cook-form m-0" data-kcal="{{ match.nutrition.calories }}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-primary {{ button_class }}"><i class="ti ti-chef-hat"></i>Приготував це</button>
+        <input type="hidden" name="servings" value="{{ servings }}">
+        <div class="eaten-row">
+            <div class="d-flex flex-column">
+                <label for="eaten-{{ prefix }}" class="fw-semibold">Скільки з'їв</label>
+                <span class="text-secondary small">у журнал ≈ <span data-eaten-kcal>{{ match.nutrition.calories }}</span> ккал</span>
+            </div>
+            <div class="stepper stepper-sm" role="group" aria-label="Скільки порцій з'їв">
+                <button type="button" class="stepper-btn" data-step="-1" aria-label="Менше"><i class="ti ti-minus"></i></button>
+                <input id="eaten-{{ prefix }}" name="eaten" type="number" min="1" max="{{ servings }}" value="1" class="stepper-input" inputmode="numeric">
+                <button type="button" class="stepper-btn" data-step="1" aria-label="Більше"><i class="ti ti-plus"></i></button>
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary {{ button_class }}"><i class="ti ti-chef-hat"></i>Приготував {{ servings }} {{ servings|uk_plural:"порцію,порції,порцій" }}</button>
+        <p class="text-secondary small mb-0 d-none d-lg-block">Спишемо продукти на {{ servings }} {{ servings|uk_plural:"порцію,порції,порцій" }}, а в журнал запишемо те, що ти з'їв.</p>
     </form>
-    <p class="text-secondary small mb-0 d-none d-lg-block">Інгредієнти буде списано з холодильника, а калорії додано в журнал.</p>
 {% else %}
-    <button type="button" class="btn btn-primary {{ button_class }}" disabled><i class="ti ti-chef-hat"></i>Приготував це</button>
+    <button type="button" class="btn btn-primary {{ button_class }}" disabled><i class="ti ti-chef-hat"></i>Не вистачає продуктів</button>
     <p class="text-secondary small mb-0 d-none d-lg-block">
         Спершу додай: {% for item in match.lacking %}{{ item.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
     </p>

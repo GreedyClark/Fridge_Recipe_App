@@ -227,3 +227,87 @@ class MealTypeTests(RecipeTestMixin, TestCase):
     def test_detail_shows_meal(self):
         response = self.client.get(reverse("recipes:detail", args=[self.soup.pk]))
         self.assertContains(response, "Обід ·")
+
+
+class ServingsTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.recipe = self.make_recipe()
+        self.client.force_login(self.owner)
+        self.url = reverse("recipes:detail", args=[self.recipe.pk])
+
+    def cook(self, **data):
+        return self.client.post(reverse("recipes:cook", args=[self.recipe.pk]), data)
+
+    def test_default_servings(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.context["servings"], 1)
+        self.assertEqual(response.context["match"].required[0].needed, 2)
+        self.assertContains(response, "Рецепт на 1 порцію")
+        self.assertContains(response, "?servings=2")
+        self.assertNotContains(response, "?servings=0")
+
+    def test_scales_ingredients_and_status(self):
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=4)
+
+        response = self.client.get(self.url, {"servings": 3})
+
+        match = response.context["match"]
+        self.assertEqual(match.required[0].needed, 6)
+        self.assertNotEqual(match.status, READY)
+        self.assertContains(response, "бракує 2 шт")
+        self.assertContains(response, "Не вистачає продуктів")
+        self.assertEqual(match.nutrition["calories"], 143)
+
+    def test_invalid_servings_are_clamped(self):
+        for value, expected in [("abc", 1), ("0", 1), ("99", 10)]:
+            response = self.client.get(self.url, {"servings": value})
+            self.assertEqual(response.context["servings"], expected)
+
+    def test_scales_from_recipe_servings(self):
+        self.recipe.servings = 4
+        self.recipe.save()
+        self.recipe.ingredients.filter(product=self.eggs).update(quantity=8)
+
+        response = self.client.get(self.url, {"servings": 1})
+
+        self.assertEqual(response.context["match"].required[0].needed, 2)
+        self.assertContains(response, "Рецепт на 4 порції")
+
+    def test_cook_writes_off_servings_and_logs_eaten(self):
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=7)
+
+        response = self.cook(servings=3, eaten=2)
+
+        self.assertRedirects(response, reverse("recipes:log"))
+        self.assertEqual(FridgeItem.objects.get(product=self.eggs).quantity, 1)
+        log = CookingLog.objects.get()
+        self.assertEqual(log.servings, 2)
+        self.assertEqual(log.calories_consumed, 286)
+        self.assertContains(self.client.get(reverse("recipes:log")), "2 порції")
+
+    def test_eaten_cannot_exceed_cooked(self):
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=4)
+
+        self.cook(servings=2, eaten=5)
+
+        self.assertEqual(CookingLog.objects.get().servings, 2)
+
+    def test_cook_without_enough_products(self):
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=4)
+
+        response = self.cook(servings=3, eaten=1)
+
+        self.assertRedirects(response, f"{self.url}?servings=3")
+        self.assertFalse(CookingLog.objects.exists())
+        self.assertEqual(FridgeItem.objects.get(product=self.eggs).quantity, 4)
+
+    def test_cook_defaults_to_one_eaten(self):
+        FridgeItem.objects.create(user=self.owner, product=self.eggs, quantity=2)
+
+        self.cook()
+
+        log = CookingLog.objects.get()
+        self.assertEqual(log.servings, 1)
+        self.assertEqual(log.calories_consumed, 143)

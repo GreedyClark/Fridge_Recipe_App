@@ -129,6 +129,7 @@ class CookingLog(models.Model):
     )
     cooked_at = models.DateTimeField("приготовано", auto_now_add=True)
     calories_consumed = models.FloatField("калорії")
+    servings = models.PositiveSmallIntegerField("порцій", default=1)
 
     class Meta:
         ordering = ["-cooked_at"]

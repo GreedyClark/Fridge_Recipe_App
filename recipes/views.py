@@ -27,7 +27,9 @@ from .services import (
     fridge_stock,
     match_recipe,
     match_recipes,
+    max_servings,
     missing_products,
+    parse_servings,
     write_off,
 )
 
@@ -165,7 +167,12 @@ class RecipeDetailView(LoginRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["match"] = match_recipe(self.object, fridge_stock(self.request.user))
+        recipe = self.object
+        servings = parse_servings(self.request.GET.get("servings"), recipe)
+        context["match"] = match_recipe(recipe, fridge_stock(self.request.user), servings)
+        context["servings"] = servings
+        context["less_url"] = f"?servings={servings - 1}" if servings > 1 else ""
+        context["more_url"] = f"?servings={servings + 1}" if servings < max_servings(recipe) else ""
         return context
 
 
@@ -185,23 +192,31 @@ class CookRecipeView(LoginRequiredMixin, View):
     def post(self, request, pk):
         recipes = Recipe.objects.visible_to(request.user).prefetch_related("ingredients__product")
         recipe = get_object_or_404(recipes, pk=pk)
-        match = match_recipe(recipe, fridge_stock(request.user))
+        servings = parse_servings(request.POST.get("servings"), recipe)
+        eaten = min(parse_servings(request.POST.get("eaten"), recipe), servings) if request.POST.get("eaten") else 1
+        detail_url = f"{reverse('recipes:detail', args=[recipe.pk])}?servings={servings}"
+
+        match = match_recipe(recipe, fridge_stock(request.user), servings)
         if match.status != READY:
             names = ", ".join(ingredient.product.name for ingredient in match.lacking)
             messages.error(request, f"Не вистачає інгредієнтів: {names}")
-            return redirect("recipes:detail", pk=recipe.pk)
+            return redirect(detail_url)
 
         with transaction.atomic():
             CookingLog.objects.create(
                 user=request.user,
                 recipe=recipe,
-                calories_consumed=match.nutrition["calories"],
+                servings=eaten,
+                calories_consumed=match.nutrition["calories"] * eaten,
             )
-            required = [ingredient for ingredient in recipe.ingredients.all() if not ingredient.optional]
-            for ingredient in required:
-                write_off(request.user, ingredient.product, ingredient.quantity)
+            used = [ingredient for ingredient in match.required if ingredient.needed is not None]
+            for ingredient in used:
+                write_off(request.user, ingredient.product, ingredient.needed)
 
-        written_off = ", ".join(str(ingredient) for ingredient in required)
+        written_off = ", ".join(
+            f"{round(ingredient.needed, 2):g} {ingredient.product.get_default_unit_display()} {ingredient.product.name}"
+            for ingredient in used
+        )
         messages.success(request, f"Записано! З холодильника списано: {written_off}")
         return redirect("recipes:log")
 

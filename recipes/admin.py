@@ -30,7 +30,7 @@ class RecipeAdmin(admin.ModelAdmin):
 
 @admin.register(CookingLog)
 class CookingLogAdmin(admin.ModelAdmin):
-    list_display = ("recipe", "user", "cooked_at", "calories_consumed")
+    list_display = ("recipe", "user", "cooked_at", "servings", "calories_consumed")
     list_filter = ("user",)
     date_hierarchy = "cooked_at"
 

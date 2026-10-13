@@ -27,7 +27,7 @@
             {% with ingredients_count=match.ingredients|length %}
                 <p class="text-secondary mt-2 mb-0">
                     {% if recipe.meal_type %}{{ recipe.get_meal_type_display }} ·{% endif %}
-                    {{ recipe.servings }} {{ recipe.servings|uk_plural:"порція,порції,порцій" }} ·
+                    Рецепт на {{ recipe.servings }} {{ recipe.servings|uk_plural:"порцію,порції,порцій" }} ·
                     {{ ingredients_count }} {{ ingredients_count|uk_plural:"інгредієнт,інгредієнти,інгредієнтів" }} ·
                     БЖУ розраховано з даних USDA
                 </p>
@@ -45,9 +45,24 @@
         </div>
 
         <div class="card">
-            <div class="card-body d-flex align-items-center justify-content-between gap-3 pb-3">
-                <h2 class="h4 mb-0">Інгредієнти</h2>
-                <span class="text-secondary small fw-semibold">потрібно · у холодильнику</span>
+            <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3 pb-3">
+                <div>
+                    <h2 class="h4 mb-1">Інгредієнти</h2>
+                    <span class="text-secondary small">на {{ servings }} {{ servings|uk_plural:"порцію,порції,порцій" }} · у холодильнику</span>
+                </div>
+                <div class="stepper" role="group" aria-label="Кількість порцій">
+                    {% if less_url %}
+                        <a href="{{ less_url }}" class="stepper-btn" aria-label="Менше порцій"><i class="ti ti-minus"></i></a>
+                    {% else %}
+                        <span class="stepper-btn disabled" aria-hidden="true"><i class="ti ti-minus"></i></span>
+                    {% endif %}
+                    <span class="stepper-value">{{ servings }} {{ servings|uk_plural:"порція,порції,порцій" }}</span>
+                    {% if more_url %}
+                        <a href="{{ more_url }}" class="stepper-btn" aria-label="Більше порцій"><i class="ti ti-plus"></i></a>
+                    {% else %}
+                        <span class="stepper-btn disabled" aria-hidden="true"><i class="ti ti-plus"></i></span>
+                    {% endif %}
+                </div>
             </div>
             {% for item in match.required %}
                 {% with unit=item.product.get_default_unit_display %}
@@ -103,20 +118,36 @@
                     <span class="text-secondary fw-semibold">ккал</span>
                 </div>
                 <div>{% include "recipes/_status_badge.html" %}</div>
-                {% include "recipes/_cook_button.html" with button_class="btn-lg w-100" %}
+                {% include "recipes/_cook_button.html" with button_class="btn-lg w-100" prefix="card" %}
             </div>
         </div>
     </div>
 </div>
 
 <div class="cook-bar d-lg-none">
-    <div class="d-flex flex-column">
-        <span class="display-num fs-4 lh-1">≈ {{ match.nutrition.calories }}</span>
-        <span class="text-secondary small fw-semibold">ккал на порцію</span>
-    </div>
-    <div class="flex-grow-1">
-        {% include "recipes/_cook_button.html" with button_class="w-100" %}
-    </div>
+    {% include "recipes/_cook_button.html" with button_class="w-100" prefix="bar" %}
 </div>
 <div class="cook-bar-spacer d-lg-none"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".cook-form").forEach((form) => {
+    const input = form.querySelector("[name=eaten]");
+    const kcal = form.querySelector("[data-eaten-kcal]");
+    const perServing = Number(form.dataset.kcal);
+    const update = () => {
+        const value = Math.min(Math.max(Number(input.value) || 1, 1), Number(input.max));
+        input.value = value;
+        kcal.textContent = (perServing * value).toLocaleString("uk-UA");
+    };
+    form.querySelectorAll("[data-step]").forEach((button) => {
+        button.addEventListener("click", () => {
+            input.value = Number(input.value) + Number(button.dataset.step);
+            update();
+        });
+    });
+    input.addEventListener("change", update);
+});
+</script>
 {% endblock %}

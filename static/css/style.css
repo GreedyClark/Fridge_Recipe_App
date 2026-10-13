@@ -738,15 +738,15 @@ h1, h2, h3, .display-num {
     bottom: calc(64px + env(safe-area-inset-bottom));
     z-index: 1020;
     display: flex;
-    align-items: center;
-    gap: 1rem;
+    flex-direction: column;
+    gap: .75rem;
     padding: .75rem 1rem;
     background: var(--fr-surface);
     border-top: 1px solid var(--fr-line);
 }
 
 .cook-bar-spacer {
-    height: 80px;
+    height: 150px;
 }
 
 @media (max-width: 767.98px) {
@@ -1304,4 +1304,93 @@ a.photo-credit:hover {
     margin: .1rem 0 0;
     flex-shrink: 0;
     accent-color: var(--fr-accent);
+}
+
+.stepper {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px;
+    background: var(--fr-surface-2);
+    border: 1px solid var(--fr-line);
+    border-radius: 999px;
+}
+
+.stepper-btn {
+    width: 44px;
+    height: 44px;
+    border: none;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+    font-size: 1.125rem;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.stepper-btn:hover {
+    color: var(--fr-on-accent);
+    filter: brightness(1.08);
+}
+
+.stepper-btn.disabled {
+    background: #3A3A40;
+    color: #8C8C92;
+    cursor: not-allowed;
+}
+
+.stepper-value {
+    min-width: 6.5rem;
+    text-align: center;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.stepper-sm .stepper-btn {
+    width: 36px;
+    height: 36px;
+}
+
+.stepper-input {
+    width: 3rem;
+    background: transparent;
+    border: none;
+    color: var(--fr-text);
+    font-weight: 700;
+    text-align: center;
+    -moz-appearance: textfield;
+}
+
+.stepper-input::-webkit-outer-spin-button,
+.stepper-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.cook-form {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.eaten-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .875rem 0;
+    border-top: 1px solid var(--fr-line);
+    border-bottom: 1px solid var(--fr-line);
+}
+
+.cook-bar .eaten-row {
+    padding: 0;
+    border: none;
+}
+
+.cook-bar .cook-form {
+    gap: .75rem;
 }

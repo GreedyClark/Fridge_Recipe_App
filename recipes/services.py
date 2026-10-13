@@ -10,6 +10,7 @@ READY = "ready"
 ALMOST = "almost"
 MISSING = "missing"
 EPSILON = 1e-6
+MAX_SERVINGS = 10
 
 
 @dataclass
@@ -38,9 +39,11 @@ class IngredientCheck:
 class RecipeMatch:
     recipe: Recipe
     ingredients: list
+    servings: int = 0
     nutrition: dict = field(init=False)
 
     def __post_init__(self):
+        self.servings = self.servings or self.recipe.servings
         self.nutrition = self.recipe.nutrition()
 
     @property
@@ -87,17 +90,36 @@ def fridge_stock(user):
     return dict(rows)
 
 
-def match_recipe(recipe, stock):
+def max_servings(recipe):
+    return max(MAX_SERVINGS, recipe.servings)
+
+
+def parse_servings(value, recipe):
+    try:
+        servings = int(value)
+    except (TypeError, ValueError):
+        return recipe.servings
+    return min(max(servings, 1), max_servings(recipe))
+
+
+def scaled(quantity, servings, recipe):
+    if quantity is None:
+        return None
+    return quantity * servings / (recipe.servings or 1)
+
+
+def match_recipe(recipe, stock, servings=None):
+    servings = servings or recipe.servings
     checks = [
         IngredientCheck(
             product=ingredient.product,
-            needed=ingredient.quantity,
+            needed=scaled(ingredient.quantity, servings, recipe),
             available=stock.get(ingredient.product_id, 0),
             optional=ingredient.optional,
         )
         for ingredient in recipe.ingredients.all()
     ]
-    return RecipeMatch(recipe=recipe, ingredients=checks)
+    return RecipeMatch(recipe=recipe, ingredients=checks, servings=servings)
 
 
 def match_recipes(user):
