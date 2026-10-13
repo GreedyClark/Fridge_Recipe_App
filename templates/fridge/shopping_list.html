@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% load recipe_extras %}
+
+{% block title %}Покупки · Fridge Recipe{% endblock %}
+
+{% block extra_css %}
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="page-label">Список покупок</div>
+    <h1 class="page-title">Покупки</h1>
+    <p class="text-secondary mb-0 mt-2">Познач «Купив», і продукт одразу потрапить у холодильник. Термін придатності можна вказати перед цим.</p>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-body p-4">
+                <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
+                    <h2 class="h4 mb-0">Купити</h2>
+                    {% with count=pending|length %}
+                        <span class="text-secondary fw-semibold">{{ count }} {{ count|uk_plural:"позиція,позиції,позицій" }}</span>
+                    {% endwith %}
+                </div>
+
+                {% for item in pending %}
+                    <div class="shopping-row">
+                        <form method="post" action="{% url 'fridge:shopping_buy' item.pk %}" class="shopping-buy" id="buy-{{ item.pk }}">
+                            {% csrf_token %}
+                            <button type="submit" class="buy-btn" aria-label="Купив: {{ item.product.name }}"><i class="ti ti-check"></i></button>
+                        </form>
+                        <div class="shopping-name">
+                            <span class="fw-bold">{{ item.product.name }}</span>
+                            {% if item.source %}<span class="text-secondary small">{{ item.source }}</span>{% endif %}
+                        </div>
+                        <span class="shopping-qty">{{ item.quantity|floatformat:"-2" }} {{ item.unit }}</span>
+                        <label class="shopping-expiry">
+                            <span>Термін</span>
+                            <input type="date" name="expiry_date" form="buy-{{ item.pk }}" aria-label="Термін придатності: {{ item.product.name }}">
+                        </label>
+                        <form method="post" action="{% url 'fridge:shopping_delete' item.pk %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="icon-btn" aria-label="Прибрати зі списку: {{ item.product.name }}"><i class="ti ti-x"></i></button>
+                        </form>
+                    </div>
+                {% empty %}
+                    <div class="empty-state py-4 border-top">
+                        <span class="empty-icon"><i class="ti ti-shopping-cart"></i></span>
+                        <h3 class="h5 mb-0">Список порожній</h3>
+                        <p class="text-secondary mb-0">Додай продукт вручну або натисни «у список» у «Чого бракує?» чи на сторінці рецепта.</p>
+                    </div>
+                {% endfor %}
+
+                {% if bought %}
+                    <div class="d-flex align-items-center justify-content-between gap-3 mt-4 mb-1">
+                        <div class="page-label mb-0">Куплено · уже в холодильнику</div>
+                        <form method="post" action="{% url 'fridge:shopping_clear' %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-trash"></i>Очистити куплене</button>
+                        </form>
+                    </div>
+                    {% for item in bought %}
+                        <div class="shopping-row bought">
+                            <span class="buy-btn done" aria-hidden="true"><i class="ti ti-check"></i></span>
+                            <span class="shopping-name fw-semibold">{{ item.product.name }}</span>
+                            <span class="text-accent small fw-semibold"><i class="ti ti-fridge"></i> + {{ item.quantity|floatformat:"-2" }} {{ item.unit }}</span>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <form method="post" action="{% url 'fridge:shopping_add' %}" class="card-body p-4 d-flex flex-column gap-3" novalidate>
+                {% csrf_token %}
+                <h2 class="h4 mb-0">Додати вручну</h2>
+                <div>
+                    <label for="{{ form.product.id_for_label }}" class="form-label">Продукт</label>
+                    {{ form.product }}
+                </div>
+                <div>
+                    <label for="{{ form.quantity.id_for_label }}" class="form-label">Кількість</label>
+                    {{ form.quantity }}
+                </div>
+                <button type="submit" class="btn btn-primary"><i class="ti ti-plus"></i>Додати в список</button>
+                <span class="text-secondary small">Якщо продукт уже є в списку, кількості додадуться.</span>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
+<script>
+    if (window.TomSelect) {
+        new TomSelect("#{{ form.product.id_for_label }}", {
+            maxOptions: null,
+            placeholder: "Почни вводити назву",
+            render: {no_results: () => '<div class="no-results">Нічого не знайдено</div>'},
+        });
+    }
+</script>
+{% endblock %}

@@ -19,6 +19,11 @@
     </form>
 {% else %}
     <button type="button" class="btn btn-primary {{ button_class }}" disabled><i class="ti ti-chef-hat"></i>Не вистачає продуктів</button>
+    <form method="post" action="{% url 'recipes:add_missing' recipe.pk %}" class="m-0">
+        {% csrf_token %}
+        <input type="hidden" name="servings" value="{{ servings }}">
+        <button type="submit" class="btn btn-ghost w-100"><i class="ti ti-shopping-cart-plus"></i>Додати відсутнє в список</button>
+    </form>
     <p class="text-secondary small mb-0 d-none d-lg-block">
         Спершу додай: {% for item in match.lacking %}{{ item.product.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
     </p>

@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import UNIT_CHOICES, FridgeItem, Product
+from .models import UNIT_CHOICES, FridgeItem, Product, ShoppingItem
 
 
 class FridgeItemForm(forms.ModelForm):
@@ -58,3 +58,28 @@ class ProductCreateForm(forms.Form):
         if data.get("unit") != "pcs":
             data["grams_per_piece"] = None
         return data
+
+
+class ShoppingItemForm(forms.ModelForm):
+    class Meta:
+        model = ShoppingItem
+        fields = ("product", "quantity")
+        widgets = {
+            "product": forms.Select(attrs={"class": "form-select"}),
+            "quantity": forms.NumberInput(
+                attrs={"class": "form-control", "step": "any", "min": "0", "inputmode": "decimal"}
+            ),
+        }
+        error_messages = {
+            "product": {"required": "Обери продукт."},
+            "quantity": {"required": "Вкажи кількість.", "min_value": "Кількість має бути більшою за нуль."},
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["product"].queryset = Product.objects.visible_to(user)
+        self.fields["product"].empty_label = "Оберіть продукт"
+
+
+class BuyForm(forms.Form):
+    expiry_date = forms.DateField(required=False)

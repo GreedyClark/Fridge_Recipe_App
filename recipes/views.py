@@ -15,7 +15,7 @@ from django.views.generic import DeleteView, DetailView, FormView, ListView, Tem
 
 from accounts.forms import DailyCaloriesForm
 from accounts.models import Profile
-from fridge.models import FridgeItem, Product
+from fridge.models import FridgeItem, Product, ShoppingItem
 
 from .forms import UNIT_LABELS, ImportedIngredientFormSet, ImportedRecipeForm, RecipeImportForm
 from .importing.errors import ImportFailed
@@ -157,6 +157,9 @@ class WhatCanICookView(LoginRequiredMixin, TemplateView):
         context["almost"] = [match for match in matches if match.status == ALMOST]
         context["missing"] = [match for match in matches if match.status == MISSING]
         context["missing_products"] = missing_products(matches)
+        context["shopping_ids"] = set(
+            ShoppingItem.objects.pending().filter(user=self.request.user).values_list("product_id", flat=True)
+        )
         context["product_count"] = (
             FridgeItem.objects.filter(user=self.request.user).values("product").distinct().count()
         )
@@ -219,6 +222,25 @@ class CookRecipeView(LoginRequiredMixin, View):
                 written_off=taken,
             )
         return redirect(f"{reverse('recipes:log')}?cooked={log.pk}")
+
+
+class AddMissingView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        recipes = Recipe.objects.visible_to(request.user).prefetch_related("ingredients__product")
+        recipe = get_object_or_404(recipes, pk=pk)
+        servings = parse_servings(request.POST.get("servings"), recipe)
+        match = match_recipe(recipe, fridge_stock(request.user), servings)
+        added = [
+            ShoppingItem.add(request.user, item.product, item.shortage, f"для: {recipe.name}"[:200])
+            for item in match.lacking
+            if item.shortage > 0
+        ]
+        if added:
+            names = ", ".join(f"{item.product.name}" for item in added)
+            messages.success(request, f"Додано в список покупок: {names}.")
+        else:
+            messages.info(request, "Усе потрібне вже є в холодильнику.")
+        return redirect(f"{reverse('recipes:detail', args=[recipe.pk])}?servings={servings}")
 
 
 class UndoCookView(LoginRequiredMixin, View):

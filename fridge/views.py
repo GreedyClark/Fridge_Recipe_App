@@ -1,15 +1,18 @@
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.db.models import Count
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils.http import url_has_allowed_host_and_scheme
+from django.views import View
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
 from recipes.importing.errors import ImportFailed
 from recipes.importing.gemini import usda_query_for
 
-from .forms import FridgeItemForm, ProductCreateForm
-from .models import FridgeItem, Product
+from .forms import BuyForm, FridgeItemForm, ProductCreateForm, ShoppingItemForm
+from .models import FridgeItem, Product, ShoppingItem
 from .usda import USDAError, import_product
 
 POPULAR_LIMIT = 5
@@ -132,3 +135,68 @@ class ProductCreateView(LoginRequiredMixin, FormView):
             self.request, f"Продукт «{product.name}» додано: {product.calories_per_100:g} ккал на 100 г."
         )
         return redirect(f"{reverse('fridge:add')}?product={product.pk}")
+
+
+def safe_next(request, default="fridge:shopping"):
+    target = request.POST.get("next", "")
+    if url_has_allowed_host_and_scheme(target, allowed_hosts={request.get_host()}, require_https=request.is_secure()):
+        return target
+    return reverse(default)
+
+
+class ShoppingListView(LoginRequiredMixin, ListView):
+    template_name = "fridge/shopping_list.html"
+    context_object_name = "items"
+
+    def get_queryset(self):
+        return ShoppingItem.objects.filter(user=self.request.user).select_related("product")
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        items = context["items"]
+        context["pending"] = [item for item in items if not item.bought]
+        context["bought"] = [item for item in items if item.bought]
+        context["form"] = kwargs.get("form") or ShoppingItemForm(user=self.request.user)
+        return context
+
+
+class ShoppingAddView(LoginRequiredMixin, View):
+    def post(self, request):
+        form = ShoppingItemForm(request.POST, user=request.user)
+        if not form.is_valid():
+            for errors in form.errors.values():
+                messages.error(request, " ".join(errors))
+            return redirect(safe_next(request))
+        product = form.cleaned_data["product"]
+        item = ShoppingItem.add(
+            request.user, product, form.cleaned_data["quantity"], request.POST.get("source", "вручну")[:200]
+        )
+        messages.success(request, f"«{product.name}» у списку покупок: {item.quantity:g} {item.unit}.")
+        return redirect(safe_next(request))
+
+
+class ShoppingBuyView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        item = get_object_or_404(ShoppingItem.objects.pending(), pk=pk, user=request.user)
+        form = BuyForm(request.POST)
+        expiry_date = form.cleaned_data["expiry_date"] if form.is_valid() else None
+        with transaction.atomic():
+            FridgeItem.objects.create(
+                user=request.user, product=item.product, quantity=item.quantity, expiry_date=expiry_date
+            )
+            item.bought = True
+            item.save(update_fields=["bought"])
+        messages.success(request, f"«{item.product.name}» додано в холодильник: {item.quantity:g} {item.unit}.")
+        return redirect("fridge:shopping")
+
+
+class ShoppingDeleteView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        get_object_or_404(ShoppingItem, pk=pk, user=request.user).delete()
+        return redirect("fridge:shopping")
+
+
+class ShoppingClearView(LoginRequiredMixin, View):
+    def post(self, request):
+        ShoppingItem.objects.filter(user=request.user, bought=True).delete()
+        return redirect("fridge:shopping")

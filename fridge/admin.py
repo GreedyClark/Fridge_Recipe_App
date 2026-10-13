@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from .models import FridgeItem, Product
+from .models import FridgeItem, Product, ShoppingItem
 
 
 @admin.register(Product)
@@ -27,3 +27,9 @@ class FridgeItemAdmin(admin.ModelAdmin):
     list_filter = ("user",)
     search_fields = ("product__name",)
     autocomplete_fields = ("product",)
+
+
+@admin.register(ShoppingItem)
+class ShoppingItemAdmin(admin.ModelAdmin):
+    list_display = ("product", "user", "quantity", "bought", "created_at")
+    list_filter = ("bought",)

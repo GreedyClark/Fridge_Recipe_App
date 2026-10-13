@@ -10,4 +10,9 @@ urlpatterns = [
     path("products/new/", views.ProductCreateView.as_view(), name="product_new"),
     path("<int:pk>/edit/", views.FridgeUpdateView.as_view(), name="edit"),
     path("<int:pk>/delete/", views.FridgeDeleteView.as_view(), name="delete"),
+    path("shopping/", views.ShoppingListView.as_view(), name="shopping"),
+    path("shopping/add/", views.ShoppingAddView.as_view(), name="shopping_add"),
+    path("shopping/<int:pk>/buy/", views.ShoppingBuyView.as_view(), name="shopping_buy"),
+    path("shopping/<int:pk>/delete/", views.ShoppingDeleteView.as_view(), name="shopping_delete"),
+    path("shopping/clear/", views.ShoppingClearView.as_view(), name="shopping_clear"),
 ]

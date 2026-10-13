@@ -105,3 +105,44 @@ class FridgeItem(models.Model):
         if days_left <= 2:
             return "soon"
         return None
+
+class ShoppingItemQuerySet(models.QuerySet):
+    def pending(self):
+        return self.filter(bought=False)
+
+
+class ShoppingItem(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shopping_items",
+        verbose_name="користувач",
+    )
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="продукт")
+    quantity = models.FloatField("кількість", validators=[MinValueValidator(0.01)])
+    source = models.CharField("звідки", max_length=200, blank=True)
+    bought = models.BooleanField("куплено", default=False)
+    created_at = models.DateTimeField("додано", auto_now_add=True)
+
+    objects = ShoppingItemQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["bought", "created_at"]
+        verbose_name = "покупка"
+        verbose_name_plural = "список покупок"
+
+    def __str__(self):
+        return f"{self.quantity:g} {self.unit} {self.product.name}"
+
+    @property
+    def unit(self):
+        return self.product.get_default_unit_display()
+
+    @classmethod
+    def add(cls, user, product, quantity, source=""):
+        item = cls.objects.pending().filter(user=user, product=product).first()
+        if item:
+            item.quantity += quantity
+            item.save(update_fields=["quantity"])
+            return item
+        return cls.objects.create(user=user, product=product, quantity=quantity, source=source)

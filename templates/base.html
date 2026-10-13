@@ -27,6 +27,7 @@
                 <a href="{% url 'fridge:list' %}" class="nav-pill {% if view == 'fridge:list' or view == 'fridge:add' or view == 'fridge:edit' or view == 'fridge:delete' or view == 'fridge:product_new' %}active{% endif %}">Холодильник</a>
                 <a href="{% url 'recipes:list' %}" class="nav-pill {% if view == 'recipes:list' or view == 'recipes:detail' or view == 'recipes:import' or view == 'recipes:import_review' or view == 'recipes:drafts' %}active{% endif %}">Рецепти</a>
                 <a href="{% url 'recipes:what_can_i_cook' %}" class="nav-pill {% if view == 'recipes:what_can_i_cook' %}active{% endif %}">Що приготувати?</a>
+                <a href="{% url 'fridge:shopping' %}" class="nav-pill {% if view == 'fridge:shopping' %}active{% endif %}">Покупки{% if shopping_count %}<span class="nav-badge">{{ shopping_count }}</span>{% endif %}</a>
                 <a href="{% url 'recipes:log' %}" class="nav-pill {% if view == 'recipes:log' %}active{% endif %}">Журнал</a>
             </nav>
 
@@ -68,6 +69,9 @@
         </a>
         <a href="{% url 'recipes:what_can_i_cook' %}" class="{% if view == 'recipes:what_can_i_cook' %}active{% endif %}">
             <span class="tabbar-icon"><i class="ti ti-chef-hat"></i></span>Приготувати
+        </a>
+        <a href="{% url 'fridge:shopping' %}" class="{% if view == 'fridge:shopping' %}active{% endif %}">
+            <span class="tabbar-icon"><i class="ti ti-shopping-cart"></i>{% if shopping_count %}<span class="nav-badge tabbar-badge">{{ shopping_count }}</span>{% endif %}</span>Покупки
         </a>
         <a href="{% url 'recipes:log' %}" class="{% if view == 'recipes:log' %}active{% endif %}">
             <span class="tabbar-icon"><i class="ti ti-chart-bar"></i></span>Журнал

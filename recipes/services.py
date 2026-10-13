@@ -79,6 +79,12 @@ class MissingProduct:
     shortage: float = 0
     unlocks: int = 0
 
+    @property
+    def to_buy(self):
+        if self.shortage > EPSILON:
+            return self.shortage
+        return 1 if self.product.default_unit == "pcs" else 100
+
 
 def fridge_stock(user):
     rows = (
