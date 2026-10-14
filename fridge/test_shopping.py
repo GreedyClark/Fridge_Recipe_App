@@ -1,12 +1,12 @@
 from datetime import date
 
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from recipes.models import Recipe, RecipeIngredient
 
-from .models import FridgeItem, Product, ShoppingItem
+from .models import FridgeItem, Product, ShoppingItem, format_quantity
 
 
 class ShoppingTests(TestCase):
@@ -185,3 +185,107 @@ class FridgeMergeTests(TestCase):
         response = self.client.get(reverse("recipes:what_can_i_cook"))
 
         self.assertContains(response, "1 з 1 інгредієнта є")
+
+
+class FormatQuantityTests(SimpleTestCase):
+    def test_friendly_units(self):
+        self.assertEqual(format_quantity(57, "g"), "57 г")
+        self.assertEqual(format_quantity(1000, "ml"), "1 л")
+        self.assertEqual(format_quantity(1200, "g"), "1,2 кг")
+        self.assertEqual(format_quantity(1250, "ml"), "1,25 л")
+        self.assertEqual(format_quantity(2.5, "pcs"), "2,5 шт")
+        self.assertEqual(format_quantity(1500, "pcs"), "1500 шт")
+
+
+class ShoppingHtmxTests(TestCase):
+    htmx = {"HTTP_HX_REQUEST": "true"}
+
+    def setUp(self):
+        self.user = User.objects.create_user("cook", password="pass")
+        self.other = User.objects.create_user("other", password="pass")
+        self.butter = Product.objects.create(name="Масло", default_unit="g", calories_per_100=748)
+        self.milk = Product.objects.create(name="Молоко", default_unit="ml", calories_per_100=52)
+        self.eggs = Product.objects.create(name="Яйце", default_unit="pcs", calories_per_100=143, grams_per_piece=50)
+        self.butter_item = ShoppingItem.objects.create(user=self.user, product=self.butter, quantity=57, source="для: Сирники")
+        self.milk_item = ShoppingItem.objects.create(user=self.user, product=self.milk, quantity=1000)
+        self.client.force_login(self.user)
+
+    def change(self, item, direction, **extra):
+        url = reverse("fridge:shopping_quantity", args=[item.pk])
+        return self.client.post(url, {"direction": direction}, **extra)
+
+    def test_page_shows_friendly_units_and_share_text(self):
+        response = self.client.get(reverse("fridge:shopping"))
+        self.assertContains(response, '<span class="shop-qty">1 л</span>', html=True)
+        self.assertContains(response, "Купив усе (2)")
+        self.assertContains(response, "Купити:\n• Масло — 57 г\n• Молоко — 1 л")
+        self.assertContains(response, "htmx.org@2.0.4")
+
+    def test_quantity_steps_by_unit(self):
+        self.change(self.butter_item, "more")
+        self.change(self.milk_item, "less")
+        self.butter_item.refresh_from_db()
+        self.milk_item.refresh_from_db()
+        self.assertEqual(self.butter_item.quantity, 107)
+        self.assertEqual(self.milk_item.quantity, 900)
+
+        eggs = ShoppingItem.objects.create(user=self.user, product=self.eggs, quantity=2)
+        self.change(eggs, "less")
+        self.change(eggs, "less")
+        eggs.refresh_from_db()
+        self.assertEqual(eggs.quantity, 1)
+
+    def test_less_never_goes_to_zero(self):
+        self.change(self.butter_item, "less")
+        self.butter_item.refresh_from_db()
+        self.assertEqual(self.butter_item.quantity, 7)
+        self.change(self.butter_item, "less")
+        self.butter_item.refresh_from_db()
+        self.assertEqual(self.butter_item.quantity, 7)
+
+    def test_htmx_returns_card_with_open_row_and_badges(self):
+        response = self.change(self.butter_item, "more", **self.htmx)
+        self.assertTemplateUsed(response, "fridge/_shopping_card.html")
+        self.assertTemplateNotUsed(response, "base.html")
+        self.assertContains(response, "107 г")
+        self.assertContains(response, f'id="panel-{self.butter_item.pk}">')
+        self.assertContains(response, f'id="panel-{self.milk_item.pk}" hidden')
+        self.assertContains(response, 'id="nav-shopping-badge" hx-swap-oob="true"')
+
+    def test_without_htmx_redirects(self):
+        response = self.change(self.butter_item, "more")
+        self.assertRedirects(response, reverse("fridge:shopping"))
+
+    def test_buy_with_htmx_updates_badge(self):
+        url = reverse("fridge:shopping_buy", args=[self.milk_item.pk])
+        response = self.client.post(url, {"expiry_date": "2026-11-01"}, **self.htmx)
+        self.assertContains(response, "«Молоко» додано в холодильник: 1 л.")
+        self.assertContains(response, '<span class="nav-badge">1</span>', html=True)
+        item = FridgeItem.objects.get(product=self.milk)
+        self.assertEqual(item.expiry_date, date(2026, 11, 1))
+
+    def test_buy_all(self):
+        response = self.client.post(reverse("fridge:shopping_buy_all"), **self.htmx)
+        self.assertContains(response, "У холодильник перенесено: 2 продукти.")
+        self.assertFalse(ShoppingItem.objects.pending().exists())
+        self.assertEqual(FridgeItem.objects.filter(user=self.user).count(), 2)
+        self.assertNotContains(response, "Купив усе")
+
+    def test_buy_all_touches_only_own_items(self):
+        foreign = ShoppingItem.objects.create(user=self.other, product=self.eggs, quantity=3)
+        self.client.post(reverse("fridge:shopping_buy_all"))
+        foreign.refresh_from_db()
+        self.assertFalse(foreign.bought)
+        self.assertFalse(FridgeItem.objects.filter(user=self.other).exists())
+
+    def test_foreign_item_quantity_protected(self):
+        foreign = ShoppingItem.objects.create(user=self.other, product=self.eggs, quantity=3)
+        self.assertEqual(self.change(foreign, "more").status_code, 404)
+        foreign.refresh_from_db()
+        self.assertEqual(foreign.quantity, 3)
+
+    def test_delete_with_htmx(self):
+        url = reverse("fridge:shopping_delete", args=[self.butter_item.pk])
+        response = self.client.post(url, **self.htmx)
+        self.assertNotContains(response, "Масло")
+        self.assertContains(response, "Купив усе (1)")

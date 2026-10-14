@@ -1,5 +1,4 @@
 {% extends "base.html" %}
-{% load recipe_extras %}
 
 {% block title %}Покупки · Fridge Recipe{% endblock %}
 
@@ -11,66 +10,12 @@
 <div class="mb-4">
     <div class="page-label">Список покупок</div>
     <h1 class="page-title">Покупки</h1>
-    <p class="text-secondary mb-0 mt-2">Познач «Купив», і продукт одразу потрапить у холодильник. Термін придатності можна вказати перед цим.</p>
+    <p class="text-secondary mb-0 mt-2">Познач «Купив», і продукт одразу потрапить у холодильник. Натисни на рядок, щоб змінити кількість або вказати термін придатності.</p>
 </div>
 
 <div class="row g-4 align-items-start">
     <div class="col-lg-8">
-        <div class="card">
-            <div class="card-body p-4">
-                <div class="d-flex align-items-center justify-content-between gap-3 mb-2">
-                    <h2 class="h4 mb-0">Купити</h2>
-                    {% with count=pending|length %}
-                        <span class="text-secondary fw-semibold">{{ count }} {{ count|uk_plural:"позиція,позиції,позицій" }}</span>
-                    {% endwith %}
-                </div>
-
-                {% for item in pending %}
-                    <div class="shopping-row">
-                        <form method="post" action="{% url 'fridge:shopping_buy' item.pk %}" class="shopping-buy" id="buy-{{ item.pk }}">
-                            {% csrf_token %}
-                            <button type="submit" class="buy-btn" aria-label="Купив: {{ item.product.name }}"><i class="ti ti-check"></i></button>
-                        </form>
-                        <div class="shopping-name">
-                            <span class="fw-bold">{{ item.product.name }}</span>
-                            {% if item.source %}<span class="text-secondary small">{{ item.source }}</span>{% endif %}
-                        </div>
-                        <span class="shopping-qty">{{ item.quantity|floatformat:"-2" }} {{ item.unit }}</span>
-                        <label class="shopping-expiry">
-                            <span>Термін</span>
-                            <input type="date" name="expiry_date" form="buy-{{ item.pk }}" aria-label="Термін придатності: {{ item.product.name }}">
-                        </label>
-                        <form method="post" action="{% url 'fridge:shopping_delete' item.pk %}" class="m-0">
-                            {% csrf_token %}
-                            <button type="submit" class="icon-btn" aria-label="Прибрати зі списку: {{ item.product.name }}"><i class="ti ti-x"></i></button>
-                        </form>
-                    </div>
-                {% empty %}
-                    <div class="empty-state py-4 border-top">
-                        <span class="empty-icon"><i class="ti ti-shopping-cart"></i></span>
-                        <h3 class="h5 mb-0">Список порожній</h3>
-                        <p class="text-secondary mb-0">Додай продукт вручну або натисни «у список» у «Чого бракує?» чи на сторінці рецепта.</p>
-                    </div>
-                {% endfor %}
-
-                {% if bought %}
-                    <div class="d-flex align-items-center justify-content-between gap-3 mt-4 mb-1">
-                        <div class="page-label mb-0">Куплено · уже в холодильнику</div>
-                        <form method="post" action="{% url 'fridge:shopping_clear' %}" class="m-0">
-                            {% csrf_token %}
-                            <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-trash"></i>Очистити куплене</button>
-                        </form>
-                    </div>
-                    {% for item in bought %}
-                        <div class="shopping-row bought">
-                            <span class="buy-btn done" aria-hidden="true"><i class="ti ti-check"></i></span>
-                            <span class="shopping-name fw-semibold">{{ item.product.name }}</span>
-                            <span class="text-accent small fw-semibold"><i class="ti ti-fridge"></i> + {{ item.quantity|floatformat:"-2" }} {{ item.unit }}</span>
-                        </div>
-                    {% endfor %}
-                {% endif %}
-            </div>
-        </div>
+        {% include "fridge/_shopping_card.html" %}
     </div>
 
     <div class="col-lg-4">
@@ -97,6 +42,49 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/js/tom-select.complete.min.js"></script>
 <script>
+    document.addEventListener("click", async event => {
+        const target = event.target.closest("[data-toggle], [data-confirm-open], [data-confirm-close], [data-share], [data-share-close], [data-copy]");
+        if (!target) return;
+        const card = document.getElementById("shopping-card");
+        const confirmBox = card.querySelector("#buy-all-confirm");
+        const sharePanel = card.querySelector("#share-panel");
+
+        if (target.matches("[data-toggle]")) {
+            const panel = document.getElementById(target.getAttribute("aria-controls"));
+            const open = target.getAttribute("aria-expanded") !== "true";
+            target.setAttribute("aria-expanded", open);
+            panel.hidden = !open;
+        } else if (target.matches("[data-confirm-open], [data-confirm-close]")) {
+            const open = target.matches("[data-confirm-open]") && confirmBox.hidden;
+            confirmBox.hidden = !open;
+            card.querySelector("[data-confirm-open]").setAttribute("aria-expanded", open);
+            if (open) sharePanel.hidden = true;
+        } else if (target.matches("[data-share]")) {
+            const text = card.querySelector("#share-text").textContent;
+            if (navigator.share && matchMedia("(pointer: coarse)").matches) {
+                try {
+                    await navigator.share({title: "Список покупок", text});
+                    return;
+                } catch (error) {
+                    if (error.name === "AbortError") return;
+                }
+            }
+            sharePanel.hidden = !sharePanel.hidden;
+            confirmBox.hidden = true;
+        } else if (target.matches("[data-share-close]")) {
+            sharePanel.hidden = true;
+        } else if (target.matches("[data-copy]")) {
+            const status = card.querySelector("[data-copy-status]");
+            try {
+                await navigator.clipboard.writeText(card.querySelector("#share-text").textContent);
+                status.textContent = "Скопійовано. Встав у Telegram чи Viber.";
+            } catch (error) {
+                getSelection().selectAllChildren(card.querySelector("#share-text"));
+                status.textContent = "Виділив текст, скопіюй його вручну.";
+            }
+        }
+    });
+
     if (window.TomSelect) {
         new TomSelect("#{{ form.product.id_for_label }}", {
             maxOptions: null,

@@ -10,6 +10,18 @@ UNIT_CHOICES = [
     ("ml", "мл"),
     ("pcs", "шт"),
 ]
+UNIT_LABELS = dict(UNIT_CHOICES)
+BIG_UNITS = {"g": "кг", "ml": "л"}
+QUANTITY_STEPS = {"g": 50, "ml": 100, "pcs": 1}
+
+
+def format_quantity(quantity, unit):
+    if unit in BIG_UNITS and quantity >= 1000:
+        quantity, label = quantity / 1000, BIG_UNITS[unit]
+    else:
+        label = UNIT_LABELS.get(unit, unit)
+    number = f"{quantity:.2f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{number} {label}"
 
 
 class ProductQuerySet(models.QuerySet):
@@ -147,6 +159,25 @@ class ShoppingItem(models.Model):
     def unit(self):
         return self.product.get_default_unit_display()
 
+    @property
+    def quantity_label(self):
+        return format_quantity(self.quantity, self.product.default_unit)
+
+    @property
+    def step(self):
+        return QUANTITY_STEPS.get(self.product.default_unit, 1)
+
+    def change_quantity(self, direction):
+        if direction == "more":
+            self.quantity += self.step
+        elif direction == "less" and self.quantity > self.step:
+            self.quantity -= self.step
+        else:
+            return False
+        self.quantity = round(self.quantity, 2)
+        self.save(update_fields=["quantity"])
+        return True
+
     @classmethod
     def add(cls, user, product, quantity, source=""):
         item = cls.objects.pending().filter(user=user, product=product).first()
@@ -155,3 +186,10 @@ class ShoppingItem(models.Model):
             item.save(update_fields=["quantity"])
             return item
         return cls.objects.create(user=user, product=product, quantity=quantity, source=source)
+
+
+def buy_items(user, items, expiry_date=None):
+    for item in items:
+        FridgeItem.add(user, item.product, item.quantity, expiry_date)
+        item.bought = True
+        item.save(update_fields=["bought"])

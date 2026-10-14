@@ -1,0 +1,112 @@
+{% load recipe_extras %}
+<div class="card" id="shopping-card" hx-target="#shopping-card" hx-swap="outerHTML">
+    <div class="card-body p-4 d-flex flex-column gap-1">
+        {% with count=pending|length %}
+            <div class="shop-head">
+                <div>
+                    <h2 class="h4 mb-1">Купити</h2>
+                    <span class="text-secondary small">
+                        {% if count %}{{ count }} {{ count|uk_plural:"позиція,позиції,позицій" }} · натисни на рядок, щоб змінити{% else %}Нічого не треба купувати{% endif %}
+                    </span>
+                </div>
+                {% if count %}
+                    <div class="shop-actions">
+                        <button type="button" class="btn btn-ghost" data-share aria-label="Поділитися списком"><i class="ti ti-share"></i><span class="d-none d-sm-inline">Поділитися</span></button>
+                        <button type="button" class="btn btn-primary" data-confirm-open aria-expanded="false" aria-controls="buy-all-confirm"><i class="ti ti-checks"></i>Купив усе ({{ count }})</button>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="shop-status" role="status">{% if notice %}<i class="ti ti-fridge"></i>{{ notice }}{% endif %}</div>
+
+            {% if count %}
+                <div class="shop-confirm" id="buy-all-confirm" role="alertdialog" aria-labelledby="buy-all-title" hidden>
+                    <span class="fw-bold" id="buy-all-title">Перенести {{ count }} {{ count|uk_plural:"продукт,продукти,продуктів" }} у холодильник?</span>
+                    <span class="text-secondary small">{% for item in pending %}{{ item.product.name }} {{ item.quantity_label }}{% if not forloop.last %}, {% endif %}{% endfor %}. Терміни придатності можна вказати потім у холодильнику.</span>
+                    <div class="d-flex flex-wrap gap-2">
+                        <form method="post" action="{% url 'fridge:shopping_buy_all' %}" hx-post="{% url 'fridge:shopping_buy_all' %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i>Так, у холодильник</button>
+                        </form>
+                        <button type="button" class="btn btn-ghost" data-confirm-close>Скасувати</button>
+                    </div>
+                </div>
+
+                <div class="shop-share" id="share-panel" hidden>
+                    <div class="d-flex align-items-center justify-content-between gap-2">
+                        <span class="fw-bold">Так виглядатиме повідомлення</span>
+                        <button type="button" class="icon-btn" data-share-close aria-label="Закрити"><i class="ti ti-x"></i></button>
+                    </div>
+                    <pre class="share-text" id="share-text">{{ share_text }}</pre>
+                    <div class="d-flex flex-wrap align-items-center gap-3">
+                        <button type="button" class="btn btn-primary" data-copy><i class="ti ti-copy"></i>Скопіювати текст</button>
+                        <span class="text-secondary small" data-copy-status aria-live="polite"></span>
+                    </div>
+                </div>
+            {% endif %}
+        {% endwith %}
+
+        <div class="shop-list">
+            {% for item in pending %}
+                <div class="shop-item">
+                    <div class="shop-line">
+                        <form method="post" action="{% url 'fridge:shopping_buy' item.pk %}" hx-post="{% url 'fridge:shopping_buy' item.pk %}" class="m-0" id="buy-{{ item.pk }}">
+                            {% csrf_token %}
+                            <button type="submit" class="buy-btn" aria-label="Купив: {{ item.product.name }}"><i class="ti ti-check"></i></button>
+                        </form>
+                        <button type="button" class="shop-toggle" data-toggle aria-expanded="{% if item.pk == open_id %}true{% else %}false{% endif %}" aria-controls="panel-{{ item.pk }}">
+                            <span class="shop-name">
+                                <span class="fw-bold">{{ item.product.name }}</span>
+                                {% if item.source %}<span class="text-secondary small">{{ item.source }}</span>{% endif %}
+                            </span>
+                            <span class="shop-qty">{{ item.quantity_label }}</span>
+                        </button>
+                    </div>
+                    <div class="shop-panel" id="panel-{{ item.pk }}"{% if item.pk != open_id %} hidden{% endif %}>
+                        <form method="post" action="{% url 'fridge:shopping_quantity' item.pk %}" hx-post="{% url 'fridge:shopping_quantity' item.pk %}" class="qty-stepper" role="group" aria-label="Кількість: {{ item.product.name }}">
+                            {% csrf_token %}
+                            <button type="submit" name="direction" value="less" aria-label="Менше на {{ item.step }} {{ item.unit }}"{% if item.quantity <= item.step %} disabled{% endif %}><i class="ti ti-minus"></i></button>
+                            <span>{{ item.quantity_label }}</span>
+                            <button type="submit" name="direction" value="more" aria-label="Більше на {{ item.step }} {{ item.unit }}"><i class="ti ti-plus"></i></button>
+                        </form>
+                        <label class="shop-expiry">
+                            <span>Термін</span>
+                            <input type="date" name="expiry_date" form="buy-{{ item.pk }}" aria-label="Термін придатності: {{ item.product.name }}">
+                        </label>
+                        <form method="post" action="{% url 'fridge:shopping_delete' item.pk %}" hx-post="{% url 'fridge:shopping_delete' item.pk %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm shop-remove"><i class="ti ti-trash"></i>Прибрати</button>
+                        </form>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty-state py-4 border-top">
+                    <span class="empty-icon"><i class="ti ti-shopping-cart"></i></span>
+                    <h3 class="h5 mb-0">Список порожній</h3>
+                    <p class="text-secondary mb-0">Додай продукт вручну або натисни «у список» у «Чого бракує?» чи на сторінці рецепта.</p>
+                </div>
+            {% endfor %}
+        </div>
+
+        {% if bought %}
+            <div class="d-flex align-items-center justify-content-between gap-3 mt-4 mb-1">
+                <div class="page-label mb-0">Куплено · уже в холодильнику</div>
+                <form method="post" action="{% url 'fridge:shopping_clear' %}" hx-post="{% url 'fridge:shopping_clear' %}" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-trash"></i>Очистити</button>
+                </form>
+            </div>
+            {% for item in bought %}
+                <div class="shop-line bought">
+                    <span class="buy-btn done" aria-hidden="true"><i class="ti ti-check"></i></span>
+                    <span class="shop-name">{{ item.product.name }}</span>
+                    <span class="text-accent small fw-semibold"><i class="ti ti-fridge"></i> + {{ item.quantity_label }}</span>
+                </div>
+            {% endfor %}
+        {% endif %}
+    </div>
+</div>
+{% if oob %}
+    <span id="nav-shopping-badge" hx-swap-oob="true">{% include "fridge/_shopping_badge.html" %}</span>
+    <span id="tab-shopping-badge" hx-swap-oob="true">{% include "fridge/_shopping_badge.html" with badge_class="tabbar-badge" %}</span>
+{% endif %}
