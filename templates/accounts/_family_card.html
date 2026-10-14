@@ -1,0 +1,99 @@
+<section class="card" id="family">
+    <div class="card-body p-4 d-flex flex-column gap-4">
+        <h2 class="h4 mb-0 d-flex align-items-center gap-2"><i class="ti ti-users text-accent"></i>Сім'я</h2>
+
+        {% if membership %}
+            {% with household=membership.household %}
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
+                    <span class="family-name">{{ household.name }}</span>
+                    <span class="family-shared">Спільне: холодильник · покупки · рецепти</span>
+                </div>
+
+                <div class="family-members">
+                    {% for member in members %}
+                        <div class="family-member">
+                            <span class="avatar{% if member.user_id == user.pk %} avatar-accent{% endif %}">{{ member.user.username|slice:":2"|upper }}</span>
+                            <div class="flex-grow-1 min-w-0">
+                                <div class="fw-bold text-break">{{ member.user.username }}{% if member.user_id == user.pk %} <span class="text-secondary fw-normal">(ти)</span>{% endif %}</div>
+                                <div class="text-secondary small">{{ member.get_role_display }} · з {{ member.joined_at|date:"j E" }}</div>
+                            </div>
+                            {% if membership.is_owner and member.user_id != user.pk %}
+                                <details class="confirm-inline">
+                                    <summary class="btn btn-ghost btn-sm">Видалити</summary>
+                                    <div class="confirm-pop">
+                                        <span class="small">Видалити {{ member.user.username }} із сім'ї? Його продукти й рецепти підуть разом із ним.</span>
+                                        <form method="post" action="{% url 'family_remove' member.user_id %}" class="m-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-ghost btn-sm btn-danger-ghost">Так, видалити</button>
+                                        </form>
+                                    </div>
+                                </details>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <div class="family-invite">
+                    <span class="fw-bold">Запросити в сім'ю</span>
+                    {% if members|length >= max_members %}
+                        <span class="text-secondary small">У сім'ї вже {{ max_members }} людей — це максимум.</span>
+                    {% else %}
+                        <div class="d-flex flex-wrap align-items-center gap-3">
+                            <span class="invite-code" id="invite-code">{{ household.invite_code }}</span>
+                            <span class="text-secondary small">або посилання</span>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary" data-copy-invite="{{ invite_url }}"><i class="ti ti-copy"></i><span>Скопіювати посилання</span></button>
+                            {% if membership.is_owner %}
+                                <form method="post" action="{% url 'family_code' %}" class="m-0">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-ghost"><i class="ti ti-refresh"></i>Новий код</button>
+                                </form>
+                            {% endif %}
+                        </div>
+                        <span class="text-secondary small">Надішли код або посилання в месенджер. Новий код скасовує старе посилання. У сім'ї до {{ max_members }} людей.</span>
+                    {% endif %}
+                </div>
+
+                <details class="confirm-inline">
+                    <summary class="btn btn-ghost btn-danger-ghost"><i class="ti ti-logout"></i>Вийти із сім'ї</summary>
+                    <div class="confirm-pop">
+                        <span class="small">Продукти й рецепти, які ти додав(ла), підуть з тобою. Решта лишиться в сім'ї.{% if members|length == 1 %} Ти тут один (одна), тож сім'ю буде видалено.{% endif %}</span>
+                        <form method="post" action="{% url 'family_leave' %}" class="m-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-ghost btn-sm btn-danger-ghost">Так, вийти</button>
+                        </form>
+                    </div>
+                </details>
+            {% endwith %}
+        {% else %}
+            <p class="text-secondary mb-0">Об'єднай холодильник, список покупок і свої рецепти з тими, з ким живеш. Журнал і норма калорій лишаються особистими.</p>
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <form method="post" action="{% url 'family_create' %}" class="family-option" novalidate>
+                        {% csrf_token %}
+                        <span class="fw-bold">Створити сім'ю</span>
+                        <div>
+                            <label for="{{ household_form.name.id_for_label }}" class="form-label small text-secondary">{{ household_form.name.label }}</label>
+                            {{ household_form.name }}
+                            {% for error in household_form.name.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-primary"><i class="ti ti-users"></i>Створити</button>
+                    </form>
+                </div>
+                <div class="col-md-6">
+                    <form method="post" action="{% url 'family_join' %}" class="family-option" novalidate>
+                        {% csrf_token %}
+                        <span class="fw-bold">Приєднатися</span>
+                        <div>
+                            <label for="{{ join_form.code.id_for_label }}" class="form-label small text-secondary">{{ join_form.code.label }}</label>
+                            {{ join_form.code }}
+                            {% for error in join_form.code.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-ghost">Приєднатися</button>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</section>

@@ -18,7 +18,11 @@
 </div>
 
 <div class="row g-4 align-items-start">
-    <div class="col-lg-6">
+    <div class="col-lg-8">
+        {% include "accounts/_family_card.html" %}
+    </div>
+
+    <div class="col-lg-4 d-flex flex-column gap-4">
         <section class="card">
             <div class="card-body p-4 d-flex flex-column gap-3">
                 <h2 class="h4 mb-0 d-flex align-items-center gap-2"><i class="ti ti-flame text-accent"></i>Денна норма</h2>
@@ -29,12 +33,10 @@
                     <span class="profile-norm">{{ norm_form.daily_calories }}<span>ккал</span></span>
                     <button type="submit" class="btn btn-ghost">Зберегти</button>
                 </form>
-                <p class="text-secondary small mb-0">Від неї рахується прогрес у журналі. Норма особиста.</p>
+                <p class="text-secondary small mb-0">Від неї рахується прогрес у журналі. Норма особиста: у кожного в сім'ї своя.</p>
             </div>
         </section>
-    </div>
 
-    <div class="col-lg-6">
         <section class="card">
             <div class="card-body p-4 d-flex flex-column gap-3">
                 <details class="password-box"{% if password_open %} open{% endif %}>
@@ -58,4 +60,20 @@
         </section>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.querySelectorAll("[data-copy-invite]").forEach(button => {
+        button.addEventListener("click", async () => {
+            const label = button.querySelector("span");
+            try {
+                await navigator.clipboard.writeText(button.dataset.copyInvite);
+                label.textContent = "Посилання скопійовано";
+            } catch (error) {
+                prompt("Скопіюй посилання:", button.dataset.copyInvite);
+            }
+        });
+    });
+</script>
 {% endblock %}

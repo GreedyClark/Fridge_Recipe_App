@@ -8,6 +8,7 @@ from django.utils.http import url_has_allowed_host_and_scheme
 from django.views import View
 from django.views.generic import CreateView, DeleteView, FormView, ListView, UpdateView
 
+from accounts.models import Household, household_of, people_ids
 from recipes.importing.errors import ImportFailed
 from recipes.importing.gemini import usda_query_for
 from recipes.templatetags.recipe_extras import uk_plural
@@ -22,7 +23,7 @@ DEFAULT_POPULAR = ["Яйце куряче", "Молоко 2.5%", "Хліб пш�
 
 class UserFridgeMixin(LoginRequiredMixin):
     def get_queryset(self):
-        return FridgeItem.objects.filter(user=self.request.user).select_related("product")
+        return FridgeItem.objects.filter(user__in=people_ids(self.request.user)).select_related("product")
 
 
 class FridgeListView(UserFridgeMixin, ListView):
@@ -62,7 +63,7 @@ class FridgeFormMixin(UserFridgeMixin):
 
     def get_popular_products(self):
         popular = list(
-            Product.objects.filter(fridgeitem__user=self.request.user)
+            Product.objects.filter(fridgeitem__user__in=people_ids(self.request.user))
             .annotate(times=Count("fridgeitem"))
             .order_by("-times", "name")[:POPULAR_LIMIT]
         )
@@ -149,16 +150,35 @@ def safe_next(request, default="fridge:shopping"):
     return reverse(default)
 
 
+def person_name(person, user):
+    return "ти" if person == user else person.username
+
+
 def shopping_context(user, open_id=None, notice=""):
-    items = list(ShoppingItem.objects.filter(user=user).select_related("product"))
+    household = household_of(user)
+    if household:
+        household = Household.objects.prefetch_related("memberships__user").get(pk=household.pk)
+    items = list(ShoppingItem.objects.for_people(user).select_related("product", "user", "taken_by", "bought_by"))
     pending = [item for item in items if not item.bought]
+    bought = [item for item in items if item.bought]
+    for item in pending:
+        item.taken_by_me = item.taken_by_id == user.pk
+        item.taker_name = item.taken_by.username if item.taken_by else ""
+        item.added_by_name = person_name(item.user, user) if household else ""
+    for item in bought:
+        item.bought_by_name = person_name(item.bought_by, user) if household and item.bought_by else ""
+
+    title = f"Купити ({household.name}):" if household else "Купити:"
     lines = [f"• {item.product.name} — {item.quantity_label}" for item in pending]
+    mine = [item for item in pending if item.taken_by_me]
     return {
+        "household": household,
         "pending": pending,
-        "bought": [item for item in items if item.bought],
+        "bought": bought,
+        "mine_count": len(mine),
         "open_id": open_id,
         "notice": notice,
-        "share_text": "\n".join(["Купити:", *lines]),
+        "share_text": "\n".join([title, *lines]),
     }
 
 
@@ -200,14 +220,22 @@ class ShoppingAddView(LoginRequiredMixin, View):
 
 class ShoppingQuantityView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        item = get_object_or_404(ShoppingItem.objects.pending().select_related("product"), pk=pk, user=request.user)
+        item = get_object_or_404(ShoppingItem.objects.pending().for_people(request.user).select_related("product"), pk=pk)
         item.change_quantity(request.POST.get("direction"))
         return shopping_response(request, open_id=item.pk)
 
 
+class ShoppingTakeView(LoginRequiredMixin, View):
+    def post(self, request, pk):
+        item = get_object_or_404(ShoppingItem.objects.pending().for_people(request.user), pk=pk)
+        item.taken_by = None if item.taken_by_id == request.user.pk else request.user
+        item.save(update_fields=["taken_by"])
+        return shopping_response(request)
+
+
 class ShoppingBuyView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        item = get_object_or_404(ShoppingItem.objects.pending().select_related("product"), pk=pk, user=request.user)
+        item = get_object_or_404(ShoppingItem.objects.pending().for_people(request.user).select_related("product"), pk=pk)
         form = BuyForm(request.POST)
         expiry_date = form.cleaned_data["expiry_date"] if form.is_valid() else None
         with transaction.atomic():
@@ -217,7 +245,10 @@ class ShoppingBuyView(LoginRequiredMixin, View):
 
 class ShoppingBuyAllView(LoginRequiredMixin, View):
     def post(self, request):
-        items = list(ShoppingItem.objects.pending().filter(user=request.user).select_related("product"))
+        items = ShoppingItem.objects.pending().for_people(request.user).select_related("product")
+        if request.POST.get("only") == "mine":
+            items = items.filter(taken_by=request.user)
+        items = list(items)
         with transaction.atomic():
             buy_items(request.user, items)
         count = len(items)
@@ -227,11 +258,11 @@ class ShoppingBuyAllView(LoginRequiredMixin, View):
 
 class ShoppingDeleteView(LoginRequiredMixin, View):
     def post(self, request, pk):
-        get_object_or_404(ShoppingItem, pk=pk, user=request.user).delete()
+        get_object_or_404(ShoppingItem.objects.for_people(request.user), pk=pk).delete()
         return shopping_response(request)
 
 
 class ShoppingClearView(LoginRequiredMixin, View):
     def post(self, request):
-        ShoppingItem.objects.filter(user=request.user, bought=True).delete()
+        ShoppingItem.objects.for_people(request.user).filter(bought=True).delete()
         return shopping_response(request)

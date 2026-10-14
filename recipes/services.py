@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 
 from django.db.models import Sum
 
+from accounts.models import people_ids
 from fridge.models import FridgeItem, Product
 
 from .models import Recipe
@@ -88,7 +89,7 @@ class MissingProduct:
 
 def fridge_stock(user):
     rows = (
-        FridgeItem.objects.filter(user=user)
+        FridgeItem.objects.filter(user__in=people_ids(user))
         .values("product")
         .annotate(total=Sum("quantity"))
         .values_list("product", "total")
@@ -153,7 +154,11 @@ def missing_products(matches, limit=10):
 def write_off(user, product, quantity):
     remaining = quantity
     taken = []
-    items = FridgeItem.objects.select_for_update().filter(user=user, product=product).order_by("added_at")
+    items = (
+        FridgeItem.objects.select_for_update()
+        .filter(user__in=people_ids(user), product=product)
+        .order_by("added_at")
+    )
     for item in items:
         if remaining <= EPSILON:
             break

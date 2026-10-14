@@ -5,6 +5,8 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from accounts.models import people_ids
+
 UNIT_CHOICES = [
     ("g", "г"),
     ("ml", "мл"),
@@ -29,7 +31,7 @@ class ProductQuerySet(models.QuerySet):
         return self.filter(owner__isnull=True)
 
     def visible_to(self, user):
-        return self.filter(Q(owner__isnull=True) | Q(owner=user))
+        return self.filter(Q(owner__isnull=True) | Q(owner__in=people_ids(user)))
 
 
 class ProductManager(models.Manager.from_queryset(ProductQuerySet)):
@@ -105,7 +107,11 @@ class FridgeItem(models.Model):
 
     @classmethod
     def add(cls, user, product, quantity, expiry_date=None):
-        item = cls.objects.filter(user=user, product=product, expiry_date=expiry_date).order_by("added_at").first()
+        item = (
+            cls.objects.filter(user__in=people_ids(user), product=product, expiry_date=expiry_date)
+            .order_by("added_at")
+            .first()
+        )
         if item:
             item.quantity += quantity
             item.save(update_fields=["quantity"])
@@ -131,6 +137,9 @@ class ShoppingItemQuerySet(models.QuerySet):
     def pending(self):
         return self.filter(bought=False)
 
+    def for_people(self, user):
+        return self.filter(user__in=people_ids(user))
+
 
 class ShoppingItem(models.Model):
     user = models.ForeignKey(
@@ -142,7 +151,23 @@ class ShoppingItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, verbose_name="продукт")
     quantity = models.FloatField("кількість", validators=[MinValueValidator(0.01)])
     source = models.CharField("звідки", max_length=200, blank=True)
+    taken_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="хто купує",
+    )
     bought = models.BooleanField("куплено", default=False)
+    bought_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="+",
+        verbose_name="хто купив",
+    )
     created_at = models.DateTimeField("додано", auto_now_add=True)
 
     objects = ShoppingItemQuerySet.as_manager()
@@ -180,7 +205,7 @@ class ShoppingItem(models.Model):
 
     @classmethod
     def add(cls, user, product, quantity, source=""):
-        item = cls.objects.pending().filter(user=user, product=product).first()
+        item = cls.objects.pending().for_people(user).filter(product=product).first()
         if item:
             item.quantity += quantity
             item.save(update_fields=["quantity"])
@@ -192,4 +217,5 @@ def buy_items(user, items, expiry_date=None):
     for item in items:
         FridgeItem.add(user, item.product, item.quantity, expiry_date)
         item.bought = True
-        item.save(update_fields=["bought"])
+        item.bought_by = user
+        item.save(update_fields=["bought", "bought_by"])

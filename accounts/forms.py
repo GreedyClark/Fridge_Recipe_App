@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserCreationForm
 
-from .models import Profile
+from .models import INVITE_LENGTH, Household, Profile
 
 
 class StyledFormMixin:
@@ -39,3 +39,33 @@ class DailyCaloriesForm(forms.ModelForm):
                 "required": "Вкажи денну норму.",
             },
         }
+
+
+class HouseholdForm(forms.ModelForm):
+    class Meta:
+        model = Household
+        fields = ["name"]
+        labels = {"name": "Назва"}
+        widgets = {
+            "name": forms.TextInput(attrs={"class": "form-control", "placeholder": "Наприклад, Дім на Липовій"}),
+        }
+        error_messages = {"name": {"required": "Придумай назву для сім'ї."}}
+
+
+class JoinForm(forms.Form):
+    code = forms.CharField(
+        label="Код запрошення",
+        max_length=INVITE_LENGTH + 4,
+        error_messages={"required": "Встав код, який тобі надіслали."},
+        widget=forms.TextInput(
+            attrs={"class": "form-control invite-input", "placeholder": "Наприклад, K7M2QX9P", "autocomplete": "off"}
+        ),
+    )
+
+    def clean_code(self):
+        code = "".join(self.cleaned_data["code"].split()).upper()
+        household = Household.objects.filter(invite_code=code).first()
+        if household is None:
+            raise forms.ValidationError("Такого коду немає. Перевір його або попроси новий.")
+        self.household = household
+        return code

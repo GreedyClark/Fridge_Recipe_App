@@ -14,7 +14,7 @@ from django.views import View
 from django.views.generic import DeleteView, DetailView, ListView, TemplateView
 
 from accounts.forms import DailyCaloriesForm
-from accounts.models import Profile
+from accounts.models import Profile, people_ids
 from fridge.models import FridgeItem, Product, ShoppingItem
 
 from .forms import (
@@ -59,7 +59,7 @@ FILTERS = [
 
 def passes_filter(match, key, user):
     if key == "mine":
-        return match.recipe.owner_id == user.pk
+        return match.recipe.owner_id is not None
     if key == "ready":
         return match.status == READY
     if key == "almost":
@@ -168,10 +168,10 @@ class WhatCanICookView(LoginRequiredMixin, TemplateView):
         context["missing"] = [match for match in matches if match.status == MISSING]
         context["missing_products"] = missing_products(matches)
         context["shopping_ids"] = set(
-            ShoppingItem.objects.pending().filter(user=self.request.user).values_list("product_id", flat=True)
+            ShoppingItem.objects.pending().for_people(self.request.user).values_list("product_id", flat=True)
         )
         context["product_count"] = (
-            FridgeItem.objects.filter(user=self.request.user).values("product").distinct().count()
+            FridgeItem.objects.filter(user__in=people_ids(self.request.user)).values("product").distinct().count()
         )
         return context
 
@@ -198,7 +198,7 @@ class RecipeDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy("recipes:list")
 
     def get_queryset(self):
-        return Recipe.objects.filter(owner=self.request.user)
+        return Recipe.objects.filter(owner__in=people_ids(self.request.user))
 
     def form_valid(self, form):
         if self.object.image:
@@ -594,7 +594,7 @@ class RecipeEditView(LoginRequiredMixin, View):
     template_name = "recipes/recipe_edit.html"
 
     def get_recipe(self):
-        recipes = Recipe.objects.filter(owner=self.request.user).prefetch_related("ingredients__product")
+        recipes = Recipe.objects.filter(owner__in=people_ids(self.request.user)).prefetch_related("ingredients__product")
         return get_object_or_404(recipes, pk=self.kwargs["pk"])
 
     def get(self, request, pk):

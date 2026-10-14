@@ -10,6 +10,12 @@
 <div class="mb-4">
     <div class="page-label">Список покупок</div>
     <h1 class="page-title">Покупки</h1>
+    {% if household %}
+        <a href="{% url 'profile' %}#family" class="family-strip mt-3">
+            <span class="family-avatars">{% for member in household.memberships.all %}<span class="avatar{% if member.user_id == user.pk %} avatar-accent{% endif %}">{{ member.user.username|slice:":2"|upper }}</span>{% endfor %}</span>
+            <span>Спільний список · {{ household.name }}</span>
+        </a>
+    {% endif %}
     <p class="text-secondary mb-0 mt-2">Познач «Купив», і продукт одразу потрапить у холодильник. Натисни на рядок, щоб змінити кількість або вказати термін придатності.</p>
 </div>
 

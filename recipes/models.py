@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Q
 from django.utils import timezone
 
+from accounts.models import people_ids
 from fridge.models import Product
 
 UNDO_WINDOW = timedelta(minutes=30)
@@ -21,7 +22,7 @@ NUTRIENT_FIELDS = {
 
 class RecipeQuerySet(models.QuerySet):
     def visible_to(self, user):
-        return self.filter(Q(owner__isnull=True) | Q(owner=user))
+        return self.filter(Q(owner__isnull=True) | Q(owner__in=people_ids(user)))
 
 
 class Recipe(models.Model):

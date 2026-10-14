@@ -28,6 +28,13 @@
                             {% csrf_token %}
                             <button type="submit" class="btn btn-primary"><i class="ti ti-check"></i>Так, у холодильник</button>
                         </form>
+                        {% if household and mine_count %}
+                            <form method="post" action="{% url 'fridge:shopping_buy_all' %}" hx-post="{% url 'fridge:shopping_buy_all' %}" class="m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="only" value="mine">
+                                <button type="submit" class="btn btn-ghost">Лише те, що беру я ({{ mine_count }})</button>
+                            </form>
+                        {% endif %}
                         <button type="button" class="btn btn-ghost" data-confirm-close>Скасувати</button>
                     </div>
                 </div>
@@ -57,10 +64,25 @@
                         <button type="button" class="shop-toggle" data-toggle aria-expanded="{% if item.pk == open_id %}true{% else %}false{% endif %}" aria-controls="panel-{{ item.pk }}">
                             <span class="shop-name">
                                 <span class="fw-bold">{{ item.product.name }}</span>
-                                {% if item.source %}<span class="text-secondary small">{{ item.source }}</span>{% endif %}
+                                {% if item.added_by_name or item.source %}
+                                    <span class="text-secondary small">{% if item.added_by_name %}{{ item.added_by_name }}{% if item.source %} · {% endif %}{% endif %}{{ item.source }}</span>
+                                {% endif %}
                             </span>
                             <span class="shop-qty">{{ item.quantity_label }}</span>
                         </button>
+                        {% if household %}
+                            {% if item.taken_by_me %}
+                                {% firstof "Береш ти. Натисни, щоб відмовитись" as who %}
+                            {% elif item.taker_name %}
+                                {% firstof "Бере "|add:item.taker_name|add:". Натисни, щоб забрати собі" as who %}
+                            {% else %}
+                                {% firstof "Ніхто не взяв. Натисни, щоб взяти" as who %}
+                            {% endif %}
+                            <form method="post" action="{% url 'fridge:shopping_take' item.pk %}" hx-post="{% url 'fridge:shopping_take' item.pk %}" class="m-0">
+                                {% csrf_token %}
+                                <button type="submit" class="take-btn{% if item.taken_by_me %} mine{% elif item.taker_name %} other{% endif %}" aria-label="{{ item.product.name }}: {{ who }}" title="{{ who }}"><i class="ti ti-hand-stop"></i></button>
+                            </form>
+                        {% endif %}
                     </div>
                     <div class="shop-panel" id="panel-{{ item.pk }}"{% if item.pk != open_id %} hidden{% endif %}>
                         <form method="post" action="{% url 'fridge:shopping_quantity' item.pk %}" hx-post="{% url 'fridge:shopping_quantity' item.pk %}" class="qty-stepper" role="group" aria-label="Кількість: {{ item.product.name }}">
@@ -88,6 +110,14 @@
             {% endfor %}
         </div>
 
+        {% if household and pending %}
+            <div class="take-legend">
+                <span><i class="ti ti-hand-stop text-accent"></i>береш ти</span>
+                <span><i class="ti ti-hand-stop take-other"></i>бере хтось інший</span>
+                <span><i class="ti ti-hand-stop take-none"></i>ніхто — натисни, щоб взяти</span>
+            </div>
+        {% endif %}
+
         {% if bought %}
             <div class="d-flex align-items-center justify-content-between gap-3 mt-4 mb-1">
                 <div class="page-label mb-0">Куплено · уже в холодильнику</div>
@@ -99,7 +129,10 @@
             {% for item in bought %}
                 <div class="shop-line bought">
                     <span class="buy-btn done" aria-hidden="true"><i class="ti ti-check"></i></span>
-                    <span class="shop-name">{{ item.product.name }}</span>
+                    <span class="shop-name">
+                        <span>{{ item.product.name }}</span>
+                        {% if item.bought_by_name %}<span class="small bought-by"><i class="ti ti-user"></i>{{ item.bought_by_name }}</span>{% endif %}
+                    </span>
                     <span class="text-accent small fw-semibold"><i class="ti ti-fridge"></i> + {{ item.quantity_label }}</span>
                 </div>
             {% endfor %}

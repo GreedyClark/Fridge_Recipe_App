@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Запрошення в сім'ю · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="invite-page">
+    <div class="card">
+        <div class="card-body p-4 p-md-5 d-flex flex-column gap-4">
+            <div>
+                <div class="page-label">Запрошення в сім'ю</div>
+                <h1 class="page-title text-break">{{ household.name }}</h1>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                {% for member in members %}
+                    <span class="member-chip"><span class="avatar">{{ member.user.username|slice:":2"|upper }}</span>{{ member.user.username }}</span>
+                {% endfor %}
+            </div>
+
+            {% if membership and membership.household_id == household.pk %}
+                <p class="mb-0">Ти вже в цій сім'ї.</p>
+                <a href="{% url 'fridge:list' %}" class="btn btn-primary align-self-start">До холодильника</a>
+            {% elif membership %}
+                <p class="mb-0">Ти зараз у сім'ї «{{ membership.household.name }}». Щоб приєднатися до іншої, спершу вийди з поточної в профілі.</p>
+                <a href="{% url 'profile' %}" class="btn btn-ghost align-self-start">До профілю</a>
+            {% elif is_full %}
+                <p class="mb-0">У цій сім'ї вже максимум людей. Попроси когось звільнити місце.</p>
+            {% else %}
+                <p class="text-secondary mb-0">Після приєднання у вас будуть спільні холодильник, список покупок і свої рецепти. Журнал і норма калорій лишаться особистими. Твої продукти з однаковими назвами об'єднаються.</p>
+                <form method="post" class="d-flex flex-wrap gap-2 m-0">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary"><i class="ti ti-users"></i>Приєднатися</button>
+                    <a href="{% url 'fridge:list' %}" class="btn btn-ghost">Не зараз</a>
+                </form>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
