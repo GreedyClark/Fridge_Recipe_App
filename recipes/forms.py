@@ -8,6 +8,8 @@ from .models import Recipe
 
 UNIT_LABELS = dict(UNIT_CHOICES)
 MAX_PHOTO_SIZE = 5 * 1024 * 1024
+MIN_RECIPE_TEXT = 40
+MAX_RECIPE_TEXT = 15000
 
 
 class RecipeImportForm(forms.Form):
@@ -21,6 +23,26 @@ class RecipeImportForm(forms.Form):
         },
         widget=forms.URLInput(
             attrs={"class": "form-control", "placeholder": "https://…", "autocomplete": "off", "inputmode": "url"}
+        ),
+    )
+
+
+class RecipeTextImportForm(forms.Form):
+    text = forms.CharField(
+        label="Текст рецепта",
+        min_length=MIN_RECIPE_TEXT,
+        max_length=MAX_RECIPE_TEXT,
+        error_messages={
+            "required": "Встав текст рецепта: назву, інгредієнти й кроки.",
+            "min_length": "Замало тексту. Встав інгредієнти з кількостями й кроки приготування.",
+            "max_length": "Текст задовгий. Залиш лише назву, інгредієнти й кроки.",
+        },
+        widget=forms.Textarea(
+            attrs={
+                "class": "form-control",
+                "rows": 12,
+                "placeholder": "Сирники\n\nСир кисломолочний 500 г\nЯйце 1 шт\nБорошно 3 ст. л.\n\nЗмішати сир з яйцем, додати борошно, обсмажити.",
+            }
         ),
     )
 

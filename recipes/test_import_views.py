@@ -7,7 +7,7 @@ from django.urls import reverse
 from fridge.models import Product
 from fridge.usda import USDAError
 
-from .importing.errors import ImportFailed
+from .importing.errors import ImportFailed, SiteUnavailable
 from .models import Recipe, RecipeImport
 
 DRAFT = {
@@ -109,6 +109,76 @@ class RecipeImportViewTests(TestCase):
         draft = RecipeImport.objects.create(user=other, url=self.url, data=DRAFT)
         response = self.client.get(reverse("recipes:import_review", args=[draft.pk]))
         self.assertEqual(response.status_code, 404)
+
+class TextImportViewTests(TestCase):
+    text = "Сирники\n\nСир кисломолочний 500 г\nЯйце 1 шт\n\nЗмішати все й обсмажити до золотистого кольору."
+
+    def setUp(self):
+        self.user = User.objects.create_user("cook", password="pass12345")
+        self.client.force_login(self.user)
+
+    def post(self, text=None):
+        return self.client.post(reverse("recipes:import"), {"mode": "text", "text": text or self.text})
+
+    def test_text_tab_opens_by_link(self):
+        response = self.client.get(reverse("recipes:import"), {"mode": "text"})
+        self.assertContains(response, "Розібрати текст")
+        self.assertContains(response, 'data-panel="link" hidden')
+        self.assertNotContains(response, 'data-panel="text" hidden')
+
+    @patch("recipes.views.run_text_import")
+    def test_text_creates_draft(self, run_text_import):
+        def fake_run(record, text):
+            record.data = dict(DRAFT, source_url="")
+            record.save()
+
+        run_text_import.side_effect = fake_run
+
+        response = self.post()
+
+        record = RecipeImport.objects.get()
+        self.assertEqual(record.url, "")
+        self.assertEqual(run_text_import.call_args.args[1], self.text)
+        self.assertRedirects(response, reverse("recipes:import_review", args=[record.pk]))
+        review = self.client.get(response.url)
+        self.assertContains(review, "Імпорт · з тексту")
+        self.assertContains(review, "Рецепт розібрано з тексту")
+        self.assertNotContains(review, "Оригінал на")
+
+    @patch("recipes.views.run_text_import")
+    def test_short_text_rejected(self, run_text_import):
+        response = self.post("Сирники")
+        self.assertContains(response, "Замало тексту")
+        self.assertFalse(RecipeImport.objects.exists())
+        run_text_import.assert_not_called()
+
+    @patch("recipes.views.run_text_import", side_effect=ImportFailed("Не вдалося знайти рецепт у тексті."))
+    def test_failure_keeps_text_tab(self, run_text_import):
+        response = self.post()
+        self.assertContains(response, "Не вдалося знайти рецепт у тексті.")
+        self.assertContains(response, 'data-panel="link" hidden')
+        self.assertContains(response, "Змішати все й обсмажити")
+
+    @override_settings(IMPORTS_PER_DAY=1)
+    @patch("recipes.views.run_text_import")
+    def test_daily_limit_counts_text(self, run_text_import):
+        RecipeImport.objects.create(user=self.user, url="https://example.com/old/")
+        response = self.post()
+        self.assertContains(response, "ліміт вичерпано")
+        run_text_import.assert_not_called()
+
+    @patch("recipes.views.run_import", side_effect=SiteUnavailable("Сервер не зміг відкрити сторінку."))
+    def test_unavailable_site_offers_text(self, run_import):
+        response = self.client.post(reverse("recipes:import"), {"url": "https://www.allrecipes.com/recipe/1/"})
+        self.assertContains(response, "Цей сайт недоступний із сервера")
+        self.assertContains(response, "Вставити текст")
+
+    @patch("recipes.views.run_import", side_effect=ImportFailed("Сайт повернув помилку 404."))
+    def test_other_errors_do_not_offer_text(self, run_import):
+        response = self.client.post(reverse("recipes:import"), {"url": "https://example.com/missing/"})
+        self.assertContains(response, "Сайт повернув помилку 404.")
+        self.assertNotContains(response, "Вставити текст")
+
 
 class ImportReviewViewTests(TestCase):
     def setUp(self):

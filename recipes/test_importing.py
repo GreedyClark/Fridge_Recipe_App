@@ -2,13 +2,15 @@ import json
 import socket
 from unittest.mock import Mock, patch
 
+import requests
+
 from django.contrib.auth.models import User
 from django.test import SimpleTestCase, TestCase, override_settings
 from google.genai import errors as genai_errors
 
 from fridge.models import Product
 
-from .importing.errors import ImportFailed
+from .importing.errors import ImportFailed, SiteUnavailable
 from .importing.extract import RawRecipe, extract_recipe
 from .importing.fetch import ensure_public_url, fetch_page
 from .importing.gemini import CHECK_QUANTITY, CHOOSE_PRODUCT, parse_recipe, usda_query_for
@@ -161,6 +163,22 @@ class FetchPageTests(SimpleTestCase):
         )
         fetched = fetch_page("https://example.com/borsch/", session=session)
         self.assertEqual(fetched.url, "https://example.com/new-borsch/")
+
+    def test_connection_error_means_site_unavailable(self, _):
+        session = self.make_session(response(status=404), requests.ConnectionError("proxy refused"))
+        with self.assertRaises(SiteUnavailable):
+            fetch_page("https://www.allrecipes.com/recipe/1/", session=session)
+
+    def test_forbidden_page_means_site_unavailable(self, _):
+        session = self.make_session(response(status=404), response(status=403))
+        with self.assertRaises(SiteUnavailable):
+            fetch_page("https://example.com/borsch/", session=session)
+
+    def test_missing_page_is_ordinary_error(self, _):
+        session = self.make_session(response(status=404), response(status=404))
+        with self.assertRaises(ImportFailed) as context:
+            fetch_page("https://example.com/borsch/", session=session)
+        self.assertNotIsInstance(context.exception, SiteUnavailable)
 
     def test_rejects_redirect_to_private_address(self, getaddrinfo):
         getaddrinfo.side_effect = [PUBLIC_ADDRESS, PUBLIC_ADDRESS, PRIVATE_ADDRESS]
@@ -344,3 +362,38 @@ class GeminiParsingTests(TestCase):
         client = self.gemini_returns(self.payload(ingredients))
         self.assertEqual(parse_recipe(self.raw, client=client)["meal_type"], "")
 
+
+
+class PastedTextTests(TestCase):
+    def setUp(self):
+        self.cheese = Product.objects.create(name="Сир кисломолочний", default_unit="g", calories_per_100=159)
+        self.raw = RawRecipe(url="", source="pasted", page_text="Сирники\nСир 500 г\nЗмішати й обсмажити.")
+
+    def gemini_returns(self, payload):
+        client = Mock()
+        client.models.generate_content.return_value = Mock(text=json.dumps(payload))
+        return client
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_builds_draft_from_text(self):
+        client = self.gemini_returns({
+            "is_recipe": True, "name": "", "servings": 3, "steps": ["Змішати й обсмажити."],
+            "ingredients": [{"original": "Сир 500 г", "product_id": self.cheese.pk, "unit": "g", "quantity": 500}],
+        })
+
+        draft = parse_recipe(self.raw, client=client)
+
+        self.assertEqual(draft["name"], "Рецепт")
+        self.assertEqual(draft["source_url"], "")
+        self.assertEqual(draft["image_url"], "")
+        self.assertEqual(draft["ingredients"][0]["product_id"], self.cheese.pk)
+        prompt = client.models.generate_content.call_args.kwargs["contents"]
+        self.assertIn("Текст рецепта, який вставив користувач:", prompt)
+        self.assertIn("Сир 500 г", prompt)
+        self.assertNotIn("Сторінка:", prompt)
+
+    @override_settings(GEMINI_API_KEY="key", GEMINI_MODEL="model")
+    def test_text_without_recipe(self):
+        client = self.gemini_returns({"is_recipe": False, "name": "", "servings": 1, "steps": [], "ingredients": []})
+        with self.assertRaisesMessage(ImportFailed, "Не вдалося знайти рецепт у тексті."):
+            parse_recipe(self.raw, client=client)

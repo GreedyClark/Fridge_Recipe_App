@@ -5,12 +5,17 @@
         <div class="photo-placeholder import-photo d-none"><i class="ti ti-camera"></i><span>Фото недоступне</span></div>
         <div class="photo-credit">Фото: {{ source_domain }}</div>
     {% else %}
-        <div class="photo-placeholder import-photo"><i class="ti ti-camera"></i><span>На сторінці немає фото</span></div>
+        <div class="photo-placeholder import-photo"><i class="ti ti-camera"></i><span>{% if from_text %}Фото можна додати своє{% else %}На сторінці немає фото{% endif %}</span></div>
     {% endif %}
     <div class="card-body p-4 d-flex flex-column gap-3">
-        <a href="{{ source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ source_domain }}</a>
+        {% if not from_text %}
+            <a href="{{ source_url }}" target="_blank" rel="noopener" class="fw-semibold"><i class="ti ti-external-link"></i> Оригінал на {{ source_domain }}</a>
+        {% endif %}
         <div class="d-flex gap-2 text-secondary small">
-            {% if record.external_id %}
+            {% if from_text %}
+                <i class="ti ti-align-left text-accent"></i>
+                <span>Рецепт розібрано з тексту. Бачиш його лише ти.</span>
+            {% elif record.external_id %}
                 <i class="ti ti-database text-accent"></i>
                 <span>Чернетка з TheMealDB. Продукти підбираються лише зі спільного довідника.</span>
             {% else %}

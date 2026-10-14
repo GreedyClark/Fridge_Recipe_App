@@ -14,7 +14,7 @@
 {% endif %}
 
 <div class="mb-4">
-    <div class="page-label">Імпорт · {{ source_domain }}</div>
+    <div class="page-label">Імпорт · {% if from_text %}з тексту{% else %}{{ source_domain }}{% endif %}</div>
     <h1 class="page-title">Перевір рецепт</h1>
     <p class="text-secondary mb-0 mt-2">Це чернетка: поки ти не натиснеш «Зберегти рецепт», нічого не записується.</p>
 </div>

@@ -128,6 +128,24 @@ class MyRecipesTests(RecipeTestMixin, TestCase):
 
 
 
+class WhatCanICookImportTests(RecipeTestMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.owner)
+        self.url = reverse("recipes:what_can_i_cook")
+
+    def test_import_button_in_header(self):
+        self.make_recipe()
+        response = self.client.get(self.url)
+        self.assertContains(response, f'href="{reverse("recipes:import")}"')
+        self.assertNotContains(response, "Тут поки немає рецептів")
+
+    def test_empty_state_offers_import(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, "Тут поки немає рецептів")
+        self.assertContains(response, f'href="{reverse("recipes:import")}"', count=2)
+
+
 class RecipeFormMixin(RecipeTestMixin):
     def setUp(self):
         super().setUp()

@@ -175,7 +175,7 @@ class RecipeImport(models.Model):
         related_name="recipe_imports",
         verbose_name="користувач",
     )
-    url = models.URLField("посилання", max_length=500)
+    url = models.URLField("посилання", max_length=500, blank=True)
     external_id = models.CharField("зовнішній id", max_length=50, blank=True)
     status = models.CharField("статус", max_length=10, choices=STATUS_CHOICES, default=DRAFT)
     data = models.JSONField("результат розбору", default=dict, blank=True)

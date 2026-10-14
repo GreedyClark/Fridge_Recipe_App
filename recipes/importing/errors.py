@@ -4,3 +4,7 @@ class ImportFailed(Exception):
 
 class QuotaExceeded(ImportFailed):
     pass
+
+
+class SiteUnavailable(ImportFailed):
+    pass

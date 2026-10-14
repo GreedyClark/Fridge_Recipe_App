@@ -11,15 +11,21 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.views import View
-from django.views.generic import DeleteView, DetailView, FormView, ListView, TemplateView
+from django.views.generic import DeleteView, DetailView, ListView, TemplateView
 
 from accounts.forms import DailyCaloriesForm
 from accounts.models import Profile
 from fridge.models import FridgeItem, Product, ShoppingItem
 
-from .forms import UNIT_LABELS, ImportedIngredientFormSet, ImportedRecipeForm, RecipeImportForm
-from .importing.errors import ImportFailed
-from .importing.pipeline import run_import
+from .forms import (
+    UNIT_LABELS,
+    ImportedIngredientFormSet,
+    ImportedRecipeForm,
+    RecipeImportForm,
+    RecipeTextImportForm,
+)
+from .importing.errors import ImportFailed, SiteUnavailable
+from .importing.pipeline import run_import, run_text_import
 from .importing.save import RowFailed, save_import, update_recipe
 from .models import CookingLog, Recipe, RecipeImport
 from .services import (
@@ -346,28 +352,51 @@ class CookingLogListView(LoginRequiredMixin, ListView):
         return context
 
 
-class RecipeImportView(LoginRequiredMixin, FormView):
+class RecipeImportView(LoginRequiredMixin, View):
     template_name = "recipes/recipe_import.html"
-    form_class = RecipeImportForm
+    LINK = "link"
+    TEXT = "text"
 
     def imports_today(self):
         return self.request.user.recipe_imports.filter(created_at__gte=day_start()).count()
 
-    def site_limit_reached(self):
+    def limit_error(self):
+        if self.imports_today() >= settings.IMPORTS_PER_DAY:
+            return f"На сьогодні ліміт вичерпано ({settings.IMPORTS_PER_DAY} імпортів). Спробуй завтра."
         site_total = RecipeImport.objects.filter(created_at__gte=day_start(), external_id="").count()
-        return site_total >= settings.IMPORTS_PER_DAY_TOTAL
+        if site_total >= settings.IMPORTS_PER_DAY_TOTAL:
+            return "Сьогодні на сайті вже вичерпано загальний ліміт імпортів. Спробуй завтра."
+        return ""
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["imports_today"] = self.imports_today()
-        context["imports_limit"] = settings.IMPORTS_PER_DAY
-        context["recent_imports"] = self.request.user.recipe_imports.select_related("recipe")[:RECENT_IMPORTS]
-        return context
+    def render_page(self, mode, link_form=None, text_form=None, site_unavailable=False):
+        user = self.request.user
+        context = {
+            "mode": mode,
+            "form": link_form or RecipeImportForm(),
+            "text_form": text_form or RecipeTextImportForm(),
+            "site_unavailable": site_unavailable,
+            "imports_today": self.imports_today(),
+            "imports_limit": settings.IMPORTS_PER_DAY,
+            "recent_imports": user.recipe_imports.select_related("recipe")[:RECENT_IMPORTS],
+        }
+        return render(self.request, self.template_name, context)
 
-    def form_valid(self, form):
+    def get(self, request):
+        mode = self.TEXT if request.GET.get("mode") == self.TEXT else self.LINK
+        return self.render_page(mode)
+
+    def post(self, request):
+        if request.POST.get("mode") == self.TEXT:
+            return self.import_text()
+        return self.import_link()
+
+    def import_link(self):
+        form = RecipeImportForm(self.request.POST)
+        if not form.is_valid():
+            return self.render_page(self.LINK, link_form=form)
+
         url = form.cleaned_data["url"]
         user = self.request.user
-
         recipe = Recipe.objects.filter(owner=user, source_url=url).first()
         if recipe:
             messages.info(self.request, "Цей рецепт уже є у твоїй книзі.")
@@ -378,20 +407,35 @@ class RecipeImportView(LoginRequiredMixin, FormView):
             messages.info(self.request, "Цей рецепт уже розібрано. Перевір чернетку.")
             return redirect("recipes:import_review", pk=draft.pk)
 
-        if self.imports_today() >= settings.IMPORTS_PER_DAY:
-            form.add_error("url", f"На сьогодні ліміт вичерпано ({settings.IMPORTS_PER_DAY} імпортів). Спробуй завтра.")
-            return self.form_invalid(form)
-
-        if self.site_limit_reached():
-            form.add_error("url", "Сьогодні на сайті вже вичерпано загальний ліміт імпортів. Спробуй завтра.")
-            return self.form_invalid(form)
+        error = self.limit_error()
+        if error:
+            form.add_error("url", error)
+            return self.render_page(self.LINK, link_form=form)
 
         record = RecipeImport.objects.create(user=user, url=url)
         try:
             run_import(record)
         except ImportFailed as exc:
             form.add_error("url", str(exc))
-            return self.form_invalid(form)
+            return self.render_page(self.LINK, link_form=form, site_unavailable=isinstance(exc, SiteUnavailable))
+        return redirect("recipes:import_review", pk=record.pk)
+
+    def import_text(self):
+        form = RecipeTextImportForm(self.request.POST)
+        if not form.is_valid():
+            return self.render_page(self.TEXT, text_form=form)
+
+        error = self.limit_error()
+        if error:
+            form.add_error("text", error)
+            return self.render_page(self.TEXT, text_form=form)
+
+        record = RecipeImport.objects.create(user=self.request.user)
+        try:
+            run_text_import(record, form.cleaned_data["text"])
+        except ImportFailed as exc:
+            form.add_error("text", str(exc))
+            return self.render_page(self.TEXT, text_form=form)
         return redirect("recipes:import_review", pk=record.pk)
 
 
@@ -509,6 +553,7 @@ class ImportReviewView(LoginRequiredMixin, View):
             "image_url": record.data.get("image_url", ""),
             "source_url": source_url,
             "source_domain": urlparse(source_url).netloc.removeprefix("www."),
+            "from_text": not source_url,
             "side_template": "recipes/_import_side.html",
             "submit_label": "Зберегти рецепт",
             "cancel_url": reverse("recipes:drafts" if record.external_id else "recipes:import"),

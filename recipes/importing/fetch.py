@@ -6,8 +6,10 @@ from urllib.parse import urljoin, urlparse
 
 import requests
 
-from .errors import ImportFailed
+from .errors import ImportFailed, SiteUnavailable
 
+BLOCKED_STATUSES = {401, 403, 429}
+UNAVAILABLE_MESSAGE = "Сервер не зміг відкрити сторінку."
 USER_AGENT = "FridgeRecipeBot/1.0 (+https://github.com/GreedyClark/Fridge_Recipe_App)"
 TIMEOUT = 10
 MAX_BYTES = 2 * 1024 * 1024
@@ -72,7 +74,7 @@ def fetch_page(url, session=None):
 
     ensure_public_url(url)
     if not allowed_by_robots(session, url):
-        raise ImportFailed("Сайт забороняє автоматичне завантаження сторінок.")
+        raise SiteUnavailable("Сайт забороняє автоматичне завантаження сторінок.")
 
     current = url
     for _ in range(MAX_REDIRECTS + 1):
@@ -80,9 +82,9 @@ def fetch_page(url, session=None):
         try:
             response = session.get(current, timeout=TIMEOUT, allow_redirects=False, stream=True)
         except requests.Timeout as exc:
-            raise ImportFailed("Сайт не відповідає. Спробуй пізніше.") from exc
+            raise SiteUnavailable("Сайт не відповідає.") from exc
         except requests.RequestException as exc:
-            raise ImportFailed("Не вдалося відкрити сторінку.") from exc
+            raise SiteUnavailable(UNAVAILABLE_MESSAGE) from exc
 
         if not response.is_redirect:
             break
@@ -94,6 +96,8 @@ def fetch_page(url, session=None):
     else:
         raise ImportFailed("Забагато переадресацій.")
 
+    if response.status_code in BLOCKED_STATUSES:
+        raise SiteUnavailable("Сайт не пускає автоматичне завантаження сторінок.")
     if response.status_code != 200:
         raise ImportFailed(f"Сайт повернув помилку {response.status_code}.")
 

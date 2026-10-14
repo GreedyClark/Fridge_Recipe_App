@@ -1821,3 +1821,73 @@ a.photo-credit:hover {
 .profile-head {
     min-width: 0;
 }
+
+.import-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    background: var(--fr-surface-2);
+    border-radius: 14px;
+}
+
+.import-tab {
+    flex: 1 1 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .5rem;
+    min-height: 44px;
+    border-radius: 10px;
+    color: var(--fr-muted);
+    font-weight: 700;
+    text-decoration: none;
+    transition: background-color .15s ease, color .15s ease;
+}
+
+.import-tab:hover {
+    color: var(--fr-text);
+}
+
+.import-tab.active {
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+}
+
+.import-tab:focus-visible {
+    outline: 2px solid var(--fr-accent);
+    outline-offset: 2px;
+}
+
+.import-panel textarea.form-control {
+    min-height: 260px;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+.unavailable-box {
+    display: flex;
+    flex-direction: column;
+    gap: .625rem;
+    background: rgba(245, 190, 85, .10);
+    border: 1px solid rgba(245, 190, 85, .4);
+    border-radius: 14px;
+    padding: .875rem 1rem;
+}
+
+.unavailable-box > .fw-bold {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--fr-warn);
+}
+
+.how-icon {
+    font-size: 1.25rem;
+    color: var(--fr-accent);
+    flex-shrink: 0;
+    line-height: 1.4;
+}
+
+.import-panel[hidden] {
+    display: none !important;
+}

@@ -4,21 +4,35 @@
 {% block title %}Що приготувати? · Fridge Recipe{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <div class="page-label">Підбір за вмістом холодильника</div>
-    {% with count=ready|length %}
-        <h1 class="cook-title">Можна приготувати <span class="text-accent">{{ count }} {{ count|uk_plural:"рецепт,рецепти,рецептів" }}</span></h1>
-    {% endwith %}
-    <p class="text-secondary fs-5 mt-2 mb-0">
-        {% if product_count %}
-            з {{ product_count }} {{ product_count|uk_plural:"продукту,продуктів,продуктів" }} у холодильнику
-        {% else %}
-            Холодильник порожній — <a href="{% url 'fridge:add' %}" class="fw-semibold text-decoration-none">додай продукти</a>, і тут з'являться рецепти
-        {% endif %}
-    </p>
+<div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-4">
+    <div>
+        <div class="page-label">Підбір за вмістом холодильника</div>
+        {% with count=ready|length %}
+            <h1 class="cook-title">Можна приготувати <span class="text-accent">{{ count }} {{ count|uk_plural:"рецепт,рецепти,рецептів" }}</span></h1>
+        {% endwith %}
+        <p class="text-secondary fs-5 mt-2 mb-0">
+            {% if product_count %}
+                з {{ product_count }} {{ product_count|uk_plural:"продукту,продуктів,продуктів" }} у холодильнику
+            {% else %}
+                Холодильник порожній — <a href="{% url 'fridge:add' %}" class="fw-semibold text-decoration-none">додай продукти</a>, і тут з'являться рецепти
+            {% endif %}
+        </p>
+    </div>
+    <a href="{% url 'recipes:import' %}" class="btn btn-ghost"><i class="ti ti-download"></i>Імпортувати рецепт</a>
 </div>
 
 {% include "recipes/_meal_tabs.html" %}
+
+{% if not ready and not almost and not missing %}
+    <div class="card">
+        <div class="card-body empty-state">
+            <span class="empty-icon"><i class="ti ti-chef-hat"></i></span>
+            <h2 class="h3 mb-0">Тут поки немає рецептів</h2>
+            <p class="text-secondary mb-0">Додай свій улюблений рецепт посиланням або текстом, і він з'явиться в підборі.</p>
+            <a href="{% url 'recipes:import' %}" class="btn btn-primary btn-lg"><i class="ti ti-download"></i>Імпортувати рецепт</a>
+        </div>
+    </div>
+{% endif %}
 
 {% if missing_products %}
     <div class="card mb-5">

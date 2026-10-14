@@ -1,0 +1,8 @@
+{% load recipe_extras %}
+<div>
+    <div class="d-flex flex-wrap align-items-center gap-3">
+        <button type="submit" class="btn btn-primary"><i class="ti ti-download"></i>{{ label }}</button>
+        <span class="text-secondary small">Сьогодні: {{ imports_today }} з {{ imports_limit }} {{ imports_limit|uk_plural:"імпорту,імпортів,імпортів" }}</span>
+    </div>
+    <div class="form-text d-none import-hint">Зазвичай 10–30 секунд. Не закривай сторінку.</div>
+</div>
