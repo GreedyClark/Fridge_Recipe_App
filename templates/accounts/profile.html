@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Профіль · Fridge Recipe{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div class="profile-head d-flex align-items-center gap-3">
+        <span class="avatar avatar-accent avatar-lg">{{ user.username|slice:":2"|upper }}</span>
+        <div class="profile-head">
+            <div class="page-label">Профіль</div>
+            <h1 class="page-title text-break">{{ user.username }}</h1>
+        </div>
+    </div>
+    <form method="post" action="{% url 'logout' %}" class="m-0">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-ghost btn-danger-ghost"><i class="ti ti-logout"></i>Вийти з акаунту</button>
+    </form>
+</div>
+
+<div class="row g-4 align-items-start">
+    <div class="col-lg-6">
+        <section class="card">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+                <h2 class="h4 mb-0 d-flex align-items-center gap-2"><i class="ti ti-flame text-accent"></i>Денна норма</h2>
+                <form method="post" action="{% url 'recipes:daily_calories' %}" class="d-flex flex-wrap align-items-center gap-2 m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="profile">
+                    <label for="{{ norm_form.daily_calories.id_for_label }}" class="visually-hidden">Денна норма, ккал</label>
+                    <span class="profile-norm">{{ norm_form.daily_calories }}<span>ккал</span></span>
+                    <button type="submit" class="btn btn-ghost">Зберегти</button>
+                </form>
+                <p class="text-secondary small mb-0">Від неї рахується прогрес у журналі. Норма особиста.</p>
+            </div>
+        </section>
+    </div>
+
+    <div class="col-lg-6">
+        <section class="card">
+            <div class="card-body p-4 d-flex flex-column gap-3">
+                <details class="password-box"{% if password_open %} open{% endif %}>
+                    <summary class="d-flex align-items-center justify-content-between gap-2">
+                        <span class="h4 mb-0 d-flex align-items-center gap-2"><i class="ti ti-lock text-accent"></i>Пароль</span>
+                        <span class="btn btn-ghost btn-sm">Змінити</span>
+                    </summary>
+                    <form method="post" action="{% url 'password_change' %}" class="d-flex flex-column gap-3 mt-3" novalidate>
+                        {% csrf_token %}
+                        {% for field in password_form %}
+                            <div>
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                            </div>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary align-self-start">Зберегти пароль</button>
+                    </form>
+                </details>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}

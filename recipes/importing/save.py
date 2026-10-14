@@ -75,6 +75,8 @@ def update_recipe(recipe, recipe_data, rows, steps):
         recipe.servings = recipe_data["servings"]
         recipe.instructions = "\n".join(steps)
         if recipe_data.get("image"):
+            if recipe.image:
+                recipe.image.delete(save=False)
             recipe.image = recipe_data["image"]
         recipe.save()
 

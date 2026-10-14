@@ -91,6 +91,15 @@ class FridgeItem(models.Model):
     def __str__(self):
         return f"{self.quantity:g} {self.unit} {self.product.name}"
 
+    @classmethod
+    def add(cls, user, product, quantity, expiry_date=None):
+        item = cls.objects.filter(user=user, product=product, expiry_date=expiry_date).order_by("added_at").first()
+        if item:
+            item.quantity += quantity
+            item.save(update_fields=["quantity"])
+            return item, False
+        return cls.objects.create(user=user, product=product, quantity=quantity, expiry_date=expiry_date), True
+
     @property
     def unit(self):
         return self.product.get_default_unit_display()

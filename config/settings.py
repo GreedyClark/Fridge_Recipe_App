@@ -95,6 +95,7 @@ GEMINI_MODEL = config("GEMINI_MODEL", default="")
 GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="", cast=Csv())
 THEMEALDB_API_KEY = config("THEMEALDB_API_KEY", default="1")
 IMPORTS_PER_DAY = config("IMPORTS_PER_DAY", default=20, cast=int)
+IMPORTS_PER_DAY_TOTAL = config("IMPORTS_PER_DAY_TOTAL", default=50, cast=int)
 
 if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

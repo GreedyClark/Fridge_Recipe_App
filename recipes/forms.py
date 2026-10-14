@@ -1,4 +1,5 @@
 from django import forms
+from django.template.defaultfilters import filesizeformat
 from django.forms import BaseFormSet, formset_factory
 
 from fridge.models import UNIT_CHOICES, Product
@@ -6,6 +7,7 @@ from fridge.models import UNIT_CHOICES, Product
 from .models import Recipe
 
 UNIT_LABELS = dict(UNIT_CHOICES)
+MAX_PHOTO_SIZE = 5 * 1024 * 1024
 
 
 class RecipeImportForm(forms.Form):
@@ -58,6 +60,12 @@ class ImportedRecipeForm(forms.Form):
         super().__init__(*args, **kwargs)
         if not allow_shared:
             del self.fields["shared"]
+
+    def clean_image(self):
+        image = self.cleaned_data.get("image")
+        if image and image.size > MAX_PHOTO_SIZE:
+            raise forms.ValidationError(f"Фото завелике: максимум {filesizeformat(MAX_PHOTO_SIZE)}.")
+        return image
 
 
 class ImportedIngredientForm(forms.Form):

@@ -128,7 +128,7 @@ class MyRecipesTests(RecipeTestMixin, TestCase):
 
 
 
-class RecipeEditTests(RecipeTestMixin, TestCase):
+class RecipeFormMixin(RecipeTestMixin):
     def setUp(self):
         super().setUp()
         self.recipe = self.make_recipe(owner=self.owner)
@@ -155,6 +155,8 @@ class RecipeEditTests(RecipeTestMixin, TestCase):
         data.update(changes)
         return data
 
+
+class RecipeEditTests(RecipeFormMixin, TestCase):
     def test_edit_page_shows_current_recipe(self):
         self.client.force_login(self.owner)
         response = self.client.get(self.url)
@@ -419,3 +421,58 @@ class DailyCaloriesTests(RecipeTestMixin, TestCase):
 
         self.assertContains(response, "не менше 800")
         self.assertEqual(Profile.for_user(self.owner).daily_calories, 2000)
+
+
+def png_file(name="photo.png"):
+    from io import BytesIO
+
+    from django.core.files.uploadedfile import SimpleUploadedFile
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (4, 4), "red").save(buffer, format="PNG")
+    return SimpleUploadedFile(name, buffer.getvalue(), content_type="image/png")
+
+
+class RecipePhotoTests(RecipeFormMixin, TestCase):
+    def setUp(self):
+        import tempfile
+
+        from django.test import override_settings
+
+        super().setUp()
+        self.media = tempfile.TemporaryDirectory()
+        self.settings_override = override_settings(MEDIA_ROOT=self.media.name)
+        self.settings_override.enable()
+        self.client.force_login(self.owner)
+
+    def tearDown(self):
+        self.settings_override.disable()
+        self.media.cleanup()
+
+    def test_large_photo_rejected(self):
+        from unittest.mock import patch
+
+        with patch("recipes.forms.MAX_PHOTO_SIZE", 10):
+            response = self.client.post(self.url, self.form_data(image=png_file()))
+
+        self.assertContains(response, "Фото завелике")
+        self.recipe.refresh_from_db()
+        self.assertFalse(self.recipe.image)
+
+    def test_replaced_and_deleted_photo_removed_from_disk(self):
+        import os
+
+        self.client.post(self.url, self.form_data(image=png_file("first.png")))
+        self.recipe.refresh_from_db()
+        first = self.recipe.image.path
+        self.assertTrue(os.path.exists(first))
+
+        self.client.post(self.url, self.form_data(image=png_file("second.png")))
+        self.recipe.refresh_from_db()
+        second = self.recipe.image.path
+        self.assertFalse(os.path.exists(first))
+        self.assertTrue(os.path.exists(second))
+
+        self.client.post(reverse("recipes:delete", args=[self.recipe.pk]))
+        self.assertFalse(os.path.exists(second))

@@ -1,5 +1,5 @@
 from django import forms
-from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
+from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm, UserCreationForm
 
 from .models import Profile
 
@@ -16,6 +16,10 @@ class LoginForm(StyledFormMixin, AuthenticationForm):
 
 
 class SignUpForm(StyledFormMixin, UserCreationForm):
+    pass
+
+
+class StyledPasswordChangeForm(StyledFormMixin, PasswordChangeForm):
     pass
 
 

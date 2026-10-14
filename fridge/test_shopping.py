@@ -146,3 +146,42 @@ class ErrorPageTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
         self.assertContains(response, "Сторінку не знайдено", status_code=404)
+
+
+class FridgeMergeTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user("cook", password="pass")
+        self.eggs = Product.objects.create(name="Яйце", default_unit="pcs", calories_per_100=143, grams_per_piece=50)
+        self.client.force_login(self.user)
+
+    def test_add_same_product_merges(self):
+        self.client.post(reverse("fridge:add"), {"product": self.eggs.pk, "quantity": 2})
+        response = self.client.post(reverse("fridge:add"), {"product": self.eggs.pk, "quantity": 3}, follow=True)
+
+        self.assertEqual(FridgeItem.objects.get().quantity, 5)
+        self.assertContains(response, "Додано до наявного")
+
+    def test_different_expiry_stays_separate(self):
+        self.client.post(reverse("fridge:add"), {"product": self.eggs.pk, "quantity": 2})
+        self.client.post(reverse("fridge:add"), {"product": self.eggs.pk, "quantity": 3, "expiry_date": "2030-01-01"})
+        self.client.post(reverse("fridge:add"), {"product": self.eggs.pk, "quantity": 1, "expiry_date": "2030-01-01"})
+
+        quantities = sorted(FridgeItem.objects.values_list("quantity", flat=True))
+        self.assertEqual(quantities, [2, 4])
+
+    def test_buy_merges_with_fridge(self):
+        FridgeItem.objects.create(user=self.user, product=self.eggs, quantity=4)
+        item = ShoppingItem.objects.create(user=self.user, product=self.eggs, quantity=6)
+
+        self.client.post(reverse("fridge:shopping_buy", args=[item.pk]))
+
+        self.assertEqual(FridgeItem.objects.get().quantity, 10)
+
+    def test_grammar_on_cook_page(self):
+        recipe = Recipe.objects.create(name="Омлет", instructions="Посмажити.")
+        RecipeIngredient.objects.create(recipe=recipe, product=self.eggs, quantity=2)
+        FridgeItem.objects.create(user=self.user, product=self.eggs, quantity=4)
+
+        response = self.client.get(reverse("recipes:what_can_i_cook"))
+
+        self.assertContains(response, "1 з 1 інгредієнта є")

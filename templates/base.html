@@ -16,7 +16,7 @@
 <body class="{% if user.is_authenticated %}has-tabbar{% endif %}">
 {% with view=request.resolver_match.view_name %}
 <header class="app-header">
-    <div class="container-xl d-flex align-items-center gap-4">
+    <div class="container-xl d-flex align-items-center gap-2 gap-md-4">
         <a href="{% if user.is_authenticated %}{% url 'fridge:list' %}{% else %}{% url 'login' %}{% endif %}" class="brand">
             <span class="brand-mark"><i class="ti ti-fridge"></i></span>
             <span>Fridge Recipe</span>
@@ -31,14 +31,10 @@
                 <a href="{% url 'recipes:log' %}" class="nav-pill {% if view == 'recipes:log' %}active{% endif %}">Журнал</a>
             </nav>
 
-            <div class="ms-auto d-flex align-items-center gap-3">
-                <span class="avatar">{{ user.username|slice:":2"|upper }}</span>
-                <span class="d-none d-md-inline fw-medium">{{ user.username }}</span>
-                <form method="post" action="{% url 'logout' %}" class="d-none d-md-block m-0">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-ghost btn-sm"><i class="ti ti-logout"></i>Вийти</button>
-                </form>
-            </div>
+            <a href="{% url 'profile' %}" class="profile-link ms-auto{% if view == 'profile' or view == 'password_change' %} active{% endif %}" aria-label="Профіль">
+                <span class="avatar avatar-accent">{{ user.username|slice:":2"|upper }}</span>
+                <span class="d-none d-md-inline fw-semibold">{{ user.username }}</span>
+            </a>
         {% else %}
             <div class="ms-auto d-flex gap-2">
                 <a href="{% url 'login' %}" class="btn btn-primary btn-sm">Увійти</a>

@@ -86,9 +86,13 @@ class FridgeCreateView(FridgeFormMixin, CreateView):
         return initial
 
     def form_valid(self, form):
-        form.instance.user = self.request.user
-        messages.success(self.request, f"Додано: {form.instance}")
-        return super().form_valid(form)
+        data = form.cleaned_data
+        item, created = FridgeItem.add(self.request.user, data["product"], data["quantity"], data["expiry_date"])
+        if created:
+            messages.success(self.request, f"Додано: {item}")
+        else:
+            messages.success(self.request, f"Додано до наявного: тепер {item}")
+        return redirect(self.success_url)
 
 
 class FridgeUpdateView(FridgeFormMixin, UpdateView):
@@ -181,9 +185,7 @@ class ShoppingBuyView(LoginRequiredMixin, View):
         form = BuyForm(request.POST)
         expiry_date = form.cleaned_data["expiry_date"] if form.is_valid() else None
         with transaction.atomic():
-            FridgeItem.objects.create(
-                user=request.user, product=item.product, quantity=item.quantity, expiry_date=expiry_date
-            )
+            FridgeItem.add(request.user, item.product, item.quantity, expiry_date)
             item.bought = True
             item.save(update_fields=["bought"])
         messages.success(request, f"«{item.product.name}» додано в холодильник: {item.quantity:g} {item.unit}.")

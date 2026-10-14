@@ -174,16 +174,9 @@ def write_off(user, product, quantity):
 
 def restore(user, written_off):
     products = Product.objects.in_bulk({row["product"] for row in written_off})
-    FridgeItem.objects.bulk_create([
-        FridgeItem(
-            user=user,
-            product=products[row["product"]],
-            quantity=row["quantity"],
-            expiry_date=row["expiry_date"],
-        )
-        for row in written_off
-        if row["product"] in products
-    ])
+    for row in written_off:
+        if row["product"] in products:
+            FridgeItem.add(user, products[row["product"]], row["quantity"], row["expiry_date"])
 
 
 def written_off_summary(written_off):

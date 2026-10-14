@@ -92,6 +92,10 @@ def meal_tabs(matches, active, **params):
     ]
 
 
+def day_start():
+    return timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
+
+
 def reviewable_imports(user):
     imports = RecipeImport.objects.filter(status=RecipeImport.DRAFT)
     if user.is_staff:
@@ -191,6 +195,8 @@ class RecipeDeleteView(LoginRequiredMixin, DeleteView):
         return Recipe.objects.filter(owner=self.request.user)
 
     def form_valid(self, form):
+        if self.object.image:
+            self.object.image.delete(save=False)
         messages.success(self.request, f"Рецепт «{self.object.name}» видалено.")
         return super().form_valid(form)
 
@@ -265,6 +271,8 @@ class DailyCaloriesView(LoginRequiredMixin, View):
             messages.success(request, f"Денну норму змінено на {form.instance.daily_calories} ккал.")
         else:
             messages.error(request, " ".join(form.errors["daily_calories"]))
+        if request.POST.get("next") == "profile":
+            return redirect("profile")
         return redirect("recipes:log")
 
 
@@ -343,8 +351,11 @@ class RecipeImportView(LoginRequiredMixin, FormView):
     form_class = RecipeImportForm
 
     def imports_today(self):
-        day_start = timezone.localtime().replace(hour=0, minute=0, second=0, microsecond=0)
-        return self.request.user.recipe_imports.filter(created_at__gte=day_start).count()
+        return self.request.user.recipe_imports.filter(created_at__gte=day_start()).count()
+
+    def site_limit_reached(self):
+        site_total = RecipeImport.objects.filter(created_at__gte=day_start(), external_id="").count()
+        return site_total >= settings.IMPORTS_PER_DAY_TOTAL
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -369,6 +380,10 @@ class RecipeImportView(LoginRequiredMixin, FormView):
 
         if self.imports_today() >= settings.IMPORTS_PER_DAY:
             form.add_error("url", f"На сьогодні ліміт вичерпано ({settings.IMPORTS_PER_DAY} імпортів). Спробуй завтра.")
+            return self.form_invalid(form)
+
+        if self.site_limit_reached():
+            form.add_error("url", "Сьогодні на сайті вже вичерпано загальний ліміт імпортів. Спробуй завтра.")
             return self.form_invalid(form)
 
         record = RecipeImport.objects.create(user=user, url=url)

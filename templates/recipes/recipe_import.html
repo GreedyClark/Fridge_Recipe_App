@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load recipe_extras %}
 
 {% block title %}Імпорт рецепта · Fridge Recipe{% endblock %}
 
@@ -34,7 +35,7 @@
                         <button type="submit" class="btn btn-primary" id="import-submit">
                             <i class="ti ti-download"></i>Розібрати рецепт
                         </button>
-                        <span class="text-secondary small">Сьогодні: {{ imports_today }} з {{ imports_limit }} імпортів</span>
+                        <span class="text-secondary small">Сьогодні: {{ imports_today }} з {{ imports_limit }} {{ imports_limit|uk_plural:"імпорту,імпортів,імпортів" }}</span>
                     </div>
                     <div class="form-text d-none mt-n2" id="import-hint">Зазвичай 10–30 секунд. Не закривай сторінку.</div>
                 </form>

@@ -5,7 +5,7 @@ from django.contrib.auth import views as auth_views
 from django.urls import include, path
 
 from accounts.forms import LoginForm
-from accounts.views import SignUpView
+from accounts.views import PasswordChangeView, ProfileView, SignUpView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -16,6 +16,8 @@ urlpatterns = [
     ),
     path("logout/", auth_views.LogoutView.as_view(), name="logout"),
     path("signup/", SignUpView.as_view(), name="signup"),
+    path("profile/", ProfileView.as_view(), name="profile"),
+    path("profile/password/", PasswordChangeView.as_view(), name="password_change"),
     path("recipes/", include("recipes.urls")),
     path("", include("fridge.urls")),
 ]

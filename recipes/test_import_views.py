@@ -73,6 +73,23 @@ class RecipeImportViewTests(TestCase):
         self.assertContains(response, "ліміт вичерпано")
         run_import.assert_not_called()
 
+    @override_settings(IMPORTS_PER_DAY_TOTAL=2)
+    @patch("recipes.views.run_import")
+    def test_site_daily_limit(self, run_import):
+        other = User.objects.create_user("other", password="pass12345")
+        RecipeImport.objects.create(user=other, url="https://example.com/a/")
+        RecipeImport.objects.create(user=other, url="https://example.com/b/")
+        RecipeImport.objects.create(user=other, url="https://www.themealdb.com/meal/1", external_id="themealdb:1")
+
+        response = self.post()
+
+        self.assertContains(response, "загальний ліміт")
+        run_import.assert_not_called()
+
+    def test_limit_counter_grammar(self):
+        with override_settings(IMPORTS_PER_DAY=21):
+            self.assertContains(self.client.get(reverse("recipes:import")), "з 21 імпорту")
+
     @patch("recipes.views.run_import")
     def test_existing_draft_is_reused(self, run_import):
         draft = RecipeImport.objects.create(user=self.user, url=self.url, data=DRAFT)

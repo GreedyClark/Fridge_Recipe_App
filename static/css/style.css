@@ -1723,3 +1723,101 @@ a.photo-credit:hover {
         padding-left: 3.5rem;
     }
 }
+
+.profile-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .625rem;
+    padding: .25rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--fr-text);
+    text-decoration: none;
+}
+
+.profile-link:hover {
+    color: var(--fr-text);
+    border-color: var(--fr-line);
+}
+
+.profile-link.active {
+    border-color: var(--fr-accent);
+}
+
+@media (min-width: 768px) {
+    .profile-link {
+        padding-right: .875rem;
+    }
+}
+
+.avatar-accent {
+    background: var(--fr-accent);
+    color: var(--fr-on-accent);
+}
+
+.avatar-lg {
+    width: 64px;
+    height: 64px;
+    font-size: 1.25rem;
+}
+
+.btn-danger-ghost {
+    --bs-btn-color: var(--fr-danger);
+    --bs-btn-border-color: rgba(255, 107, 94, .4);
+    --bs-btn-hover-color: var(--fr-danger);
+    --bs-btn-hover-border-color: var(--fr-danger);
+}
+
+.profile-norm {
+    display: inline-flex;
+    align-items: center;
+    gap: .375rem;
+    background: var(--fr-surface-2);
+    border: 1px solid var(--fr-line);
+    border-radius: 14px;
+    min-height: 48px;
+    padding: 0 .875rem;
+    color: var(--fr-muted);
+    font-weight: 600;
+}
+
+.profile-norm input {
+    width: 5rem;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--fr-text);
+    font-weight: 700;
+    font-size: 1rem;
+}
+
+.password-box summary {
+    list-style: none;
+    cursor: pointer;
+}
+
+.password-box summary::-webkit-details-marker {
+    display: none;
+}
+
+.password-box[open] summary .btn {
+    display: none;
+}
+
+@media (max-width: 575.98px) {
+    .app-header .btn-sm {
+        padding-left: .7rem;
+        padding-right: .7rem;
+        font-size: .85rem;
+    }
+
+    .brand {
+        gap: 8px;
+        font-size: 1.05rem;
+        white-space: nowrap;
+    }
+}
+
+.profile-head {
+    min-width: 0;
+}
