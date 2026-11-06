@@ -1,234 +1,150 @@
 # Fridge Recipe
 
-Веб-застосунок на Django, який знає, що лежить у твоєму холодильнику, і підказує, що з цього приготувати.
+A Django web app that tracks what is in your fridge and suggests recipes you can cook from it. Cooking a recipe writes the ingredients off the fridge and logs the calories. Missing products go to a shopping list that a couple or a family can share. Recipes come from TheMealDB or from any page or pasted text, parsed by Gemini.
 
-Додаєш продукти → бачиш рецепти, які можна приготувати зараз або яким бракує одного-двох інгредієнтів → обираєш кількість порцій і натискаєш «Приготував», і продукти списуються з холодильника, а калорії потрапляють у журнал. Чого бракує — одним натиском іде в список покупок. Будь-який рецепт з інтернету можна імпортувати за посиланням або просто вставленим текстом: його розбирає Gemini, а ти перевіряєш чернетку перед збереженням. Пара чи сім'я може вести один холодильник і один список покупок на всіх.
+**Live demo:** https://peangqin.pythonanywhere.com
 
-**Демо:** https://peangqin.pythonanywhere.com
+![Fridge Recipe](docs/cover.png)
 
-## Можливості
+## Screenshots
 
-**Холодильник**
-- продукти з кількістю й терміном придатності, підсвічування того, що скоро зіпсується
-- довідник із ~200 спільних продуктів, пошук з підказками, «часто додають», калорійність і БЖУ на 100 г
-- свій продукт, якого немає в довіднику: Gemini перекладає назву, калорійність підтягується з USDA, продукт бачить автор і його сім'я
-- повторне «Додати» того самого продукту з тим самим терміном збільшує кількість у наявному рядку
+The interface is in Ukrainian. All screenshots use demo data.
 
-**Рецепти**
-- статус кожного рецепта: «Можна приготувати», «Майже» (з переліком, чого бракує), «Бракує багато»
-- сторінка «Що приготувати?» з підказкою, який продукт докупити, щоб відкрити найбільше рецептів
-- категорії за прийомом їжі: сніданок, обід, вечеря, перекус
-- перемикач порцій: кількості, статус «є / бракує» й списання перераховуються під вибрану кількість
-- калорійність і БЖУ порції, розраховані з даних USDA FoodData Central
-- пошук і фільтри: можна приготувати, майже, до 500 ккал, мої
+| What can I cook | Recipe | Fridge |
+|---|---|---|
+| ![What can I cook](docs/cook.png) | ![Recipe](docs/recipe.png) | ![Fridge](docs/fridge.png) |
 
-**Спільна база з TheMealDB**
-- команда `import_themealdb` бере страви з відкритої бази TheMealDB і робить з них чернетки українською
-- кожну чернетку перевіряє адміністратор на сторінці «Чернетки для спільної бази» і зберігає як спільний рецепт або відхиляє
-- на сторінці такого рецепта вказано джерело: «Дані й фото: TheMealDB»
+| Family shopping list | Import from text | Journal |
+|---|---|---|
+| ![Shopping list](docs/shopping.png) | ![Import](docs/import.png) | ![Journal](docs/journal.png) |
 
-**Імпорт рецептів за посиланням або текстом**
-- дві вкладки: «Посилання» і «Текст рецепта» — для рецептів з Instagram, месенджерів чи сайтів, які сервер не може відкрити
-- для посилань спершу шукає розмітку schema.org/Recipe (JSON-LD), інакше бере текст сторінки; якщо сайт недоступний із сервера, пропонує вставити текст
-- Gemini перекладає кроки українською, зіставляє інгредієнти з довідником і переводить побутові міри в грами («склянка гречки» → 165 г)
-- форма перевірки чернетки: вибір продукту, кількість, «за смаком», попередження для сумнівних рядків
-- продукти, яких немає в довіднику, автоматично додаються з USDA
-- імпортовані рецепти приватні: їх бачить власник і його сім'я, можна редагувати й видаляти
-- фото не копіюються: показуються з сайту-джерела з підписом «Фото: домен», можна завантажити своє (до 5 МБ)
+## Features
 
-**Журнал**
-- що й коли приготовано, скільки порцій з'їдено, калорії за день і графік за тиждень
-- денна норма калорій: прогрес за сьогодні, лінія норми на графіку, дні понад норму підсвічені
-- «Скасувати» протягом 30 хвилин після готування: запис зникає, продукти повертаються в холодильник з тими самими термінами
+**Fridge**
+- Products with quantity and expiry date; items about to expire get a warning.
+- A catalog of about 200 shared products with calories and macros per 100 g from USDA FoodData Central, plus search with suggestions.
+- You can add your own product: Gemini translates the name for the USDA query and the app fetches its nutrition.
+- Adding a product that is already there with the same expiry date increases the quantity instead of creating a second row.
 
-**Список покупок**
-- додати вручну, з «Чого бракує?» або всі відсутні продукти рецепта з урахуванням порцій
-- працює без перезавантаження сторінки (HTMX): натискання на рядок відкриває «− кількість +» (крок 50 г, 100 мл або 1 шт), термін придатності й «Прибрати»
-- кількості в зручних одиницях: «1,2 кг», «1 л»
-- однакові продукти об'єднуються, кількості сумуються
-- «Купив» одразу переносить продукт у холодильник і об'єднує з наявним рядком; «Купив усе» — з підтвердженням
-- «Поділитися»: на телефоні системне меню (Telegram, Viber…), на комп'ютері — копіювання тексту
-- бейдж з кількістю позицій у меню
+**Recipes and "What can I cook"**
+- Each recipe gets a status: ready to cook, almost (with the list of what is missing) or missing a lot.
+- The app suggests the one product that would unlock the most recipes.
+- Meal categories, a servings switcher that recalculates quantities and statuses, calories and macros per serving.
+- "Cooked it" writes the products off the fridge and adds the calories you ate to the journal. You can undo it for 30 minutes and get the products back with their original expiry dates.
 
-**Сім'я**
-- профіль → «Сім'я»: створити сім'ю або приєднатися за кодом-запрошенням чи посиланням `/family/join/<код>/`
-- спільні холодильник, «Що приготувати?», список покупок, свої рецепти й продукти; журнал і норма калорій у кожного свої
-- у покупках рука «хто купує»: салатова — береш ти, помаранчева — хтось інший, сіра — ніхто; «Купив усе» пропонує «Лише те, що беру я»
-- до 6 людей; той, хто створив, оновлює код і може видалити учасника
-- при приєднанні однакові приватні продукти зливаються в один; при виході людина забирає те, що додала сама, а сім'ї лишаються копії продуктів, які вона використовує
+**Import**
+- Two tabs: a link or pasted text. Text covers Instagram posts, messenger messages and sites the server cannot open.
+- For links the app looks for schema.org/Recipe JSON-LD first and falls back to the page text.
+- Gemini returns structured JSON: Ukrainian steps, ingredients matched to the catalog, household measures converted to grams ("a cup of buckwheat" becomes 165 g).
+- You review the draft before saving: pick products, fix quantities, mark "to taste". Unknown products are added from USDA.
+- A shared recipe base from TheMealDB: a management command creates Ukrainian drafts, and an admin approves or rejects each one.
 
-**Профіль**
-- денна норма калорій, зміна пароля, вихід з акаунту (на телефоні — через аватар у шапці)
+**Shopping list**
+- Works without page reloads (HTMX): tap a row to change the quantity, set an expiry date or remove it.
+- Quantities in readable units ("1.2 kg", "1 l"); repeated products merge into one row.
+- "Bought" moves the product to the fridge. "Bought everything" asks for confirmation first.
+- Share button: the system share sheet on a phone, copy to clipboard on a desktop.
 
-## Технології
+**Family**
+- One user creates a family in the profile and sends an invite code or link; up to 6 members.
+- Members share the fridge, the shopping list, their own recipes and products. The journal and the calorie goal stay personal.
+- A hand icon on each shopping row shows who is buying it: lime for you, orange for someone else, grey for nobody.
+- On joining, private products with the same name merge into one. A member who leaves takes their own products and recipes, and the family keeps copies of the products it uses.
 
-- Python 3.14, Django 5.2, SQLite
-- Bootstrap 5.3 з власною темною темою, Tabler Icons, Tom Select, HTMX
-- USDA FoodData Central API — калорійність і БЖУ продуктів
-- TheMealDB API — відкрита база рецептів для спільної бази
-- Google Gemini API (`google-genai`) — розбір рецептів зі структурованою JSON-відповіддю
-- BeautifulSoup — витягування рецепта зі сторінки
-- `python-decouple` — налаштування через `.env`
-- pytest-django і pytest-playwright — браузерні тести
+**Journal**
+- Meals by day, calories for today against a daily goal, a 7-day chart with days over the goal highlighted.
 
-## Безпека імпорту
+## Stack
 
-Завантаження чужих сторінок — потенційно небезпечна операція, тому:
-- дозволені лише `http`/`https` і лише публічні адреси (захист від SSRF, кожна переадресація перевіряється заново)
-- враховується `robots.txt`
-- таймаут 10 с, розмір сторінки до 2 МБ, лише HTML
-- текст сторінки передається Gemini як дані, інструкції всередині нього ігноруються
-- ліміт імпортів на користувача за добу (`IMPORTS_PER_DAY`) і загальний на весь сайт (`IMPORTS_PER_DAY_TOTAL`)
+Python 3.14 (3.13 on the server), Django 5.2, SQLite. Bootstrap 5.3 with a custom dark theme, HTMX, Tom Select, Tabler Icons. Google Gemini (`google-genai`) for recipe parsing, USDA FoodData Central for nutrition, TheMealDB for the shared recipes, BeautifulSoup for page extraction. Tests: Django test runner and pytest-playwright. Hosting: PythonAnywhere free tier.
 
-## Встановлення
+## Import safety
 
-Потрібні Python 3.14 і Git.
+- Only `http`/`https` and public addresses (SSRF protection); the app checks every redirect again.
+- The fetcher respects `robots.txt`, stops after 10 seconds and reads at most 2 MB of HTML.
+- The prompt marks the page text as data, so instructions inside it have no effect.
+- Daily import limits per user (`IMPORTS_PER_DAY`) and for the whole site (`IMPORTS_PER_DAY_TOTAL`).
+
+## Installation
 
 ```bash
 git clone https://github.com/GreedyClark/Fridge_Recipe_App.git
 cd Fridge_Recipe_App
 python -m venv venv
-```
-
-Активація віртуального оточення:
-
-```bash
-# Windows (PowerShell)
-.\venv\Scripts\Activate.ps1
-
-# Linux / macOS
-source venv/bin/activate
-```
-
-Якщо PowerShell забороняє запуск скриптів, один раз виконай `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`.
-
-```bash
+source venv/bin/activate        # Windows: .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+cp .env.example .env            # Windows: Copy-Item .env.example .env
 ```
 
-### Налаштування `.env`
-
-Скопіюй приклад і заповни ключі:
-
-```bash
-cp .env.example .env          # Windows: Copy-Item .env.example .env
-```
-
-| Змінна | Опис |
+| Variable | Description |
 |---|---|
-| `SECRET_KEY` | секретний ключ Django, згенерувати: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"` |
-| `DEBUG` | `True` для розробки |
-| `ALLOWED_HOSTS` | через кому, наприклад `127.0.0.1,localhost` |
-| `USDA_API_KEY` | ключ USDA FoodData Central |
-| `GEMINI_API_KEY` | ключ Google Gemini; без нього імпорт вимкнений, решта застосунку працює |
-| `GEMINI_MODEL` | основна модель, наприклад `gemini-3.8-flash` |
-| `GEMINI_FALLBACK_MODELS` | запасні моделі через кому — використовуються, коли основна перевантажена (503) або вичерпано її ліміт (429) |
-| `IMPORTS_PER_DAY` | скільки імпортів на добу дозволено одному користувачу (за замовчуванням 20) |
-| `IMPORTS_PER_DAY_TOTAL` | загальний ліміт імпортів на добу на весь сайт (за замовчуванням 50) |
-| `THEMEALDB_API_KEY` | ключ TheMealDB; за замовчуванням тестовий ключ `1`, якого достатньо для розробки |
-
-Файл називається саме `.env` — з крапкою на початку і без `.txt`.
-
-### Як отримати ключі
-
-**USDA FoodData Central** — безкоштовно: заповни форму на https://fdc.nal.usda.gov/api-key-signup.html, ключ прийде на пошту.
-
-**Google Gemini** — безкоштовний тариф: увійди на https://aistudio.google.com з Google-акаунтом → **Get API key** → **Create API key**. Список доступних моделей для твого ключа:
-
-```bash
-python manage.py shell -c "from google import genai; from django.conf import settings; [print(m.name) for m in genai.Client(api_key=settings.GEMINI_API_KEY).models.list() if 'flash' in m.name]"
-```
-
-### База даних
+| `SECRET_KEY` | Django secret key |
+| `DEBUG` | `True` for development |
+| `ALLOWED_HOSTS` | comma-separated, e.g. `127.0.0.1,localhost` |
+| `USDA_API_KEY` | free key from https://fdc.nal.usda.gov/api-key-signup.html |
+| `GEMINI_API_KEY` | key from https://aistudio.google.com; without it the import is off and the rest works |
+| `GEMINI_MODEL` | main model, e.g. `gemini-3.8-flash` |
+| `GEMINI_FALLBACK_MODELS` | comma-separated models to try when the main one returns 503 or 429 |
+| `IMPORTS_PER_DAY` | imports per user per day, 20 by default |
+| `IMPORTS_PER_DAY_TOTAL` | imports for the whole site per day, 50 by default |
+| `THEMEALDB_API_KEY` | TheMealDB key; the test key `1` is enough for development |
 
 ```bash
 python manage.py migrate
 python manage.py createsuperuser
-python manage.py import_products_from_usda   # довідник продуктів з USDA (потрібен USDA_API_KEY)
-python manage.py loaddata initial_recipes    # 8 стартових рецептів
+python manage.py import_products_from_usda    # product catalog, needs USDA_API_KEY
+python manage.py loaddata initial_recipes     # 8 starter recipes
+python manage.py import_themealdb --limit 10  # drafts for the shared base, needs Gemini
 python manage.py runserver
 ```
 
-### Спільна база рецептів з TheMealDB
+The app runs at http://127.0.0.1:8000/, the admin at `/admin/`. TheMealDB drafts appear for the admin under "Recipes" → "Drafts".
 
-```bash
-python manage.py import_themealdb --limit 10                     # 10 нових страв
-python manage.py import_themealdb --limit 5 --category Breakfast # лише сніданки
-```
+## Deployment (PythonAnywhere)
 
-Команда пропускає вже імпортовані страви, робить паузу між запитами до Gemini (`--delay`, за замовчуванням 5 с) і зупиняється, якщо вичерпано ліміт Gemini. Чернетки з'являються в адміністратора на сторінці «Рецепти» → «Чернетки».
+The free tier allows Gemini and USDA but blocks cooking sites and TheMealDB, so on the server you import recipes as text.
 
-Застосунок відкриється на http://127.0.0.1:8000/, адмінка — на `/admin/`.
+1. In a Bash console: clone the repo, create a Python 3.13 virtualenv, `pip install -r requirements.txt`.
+2. Create `.env` with `DEBUG=False`, a new `SECRET_KEY`, `ALLOWED_HOSTS=<login>.pythonanywhere.com` and `CSRF_TRUSTED_ORIGINS=https://<login>.pythonanywhere.com`.
+3. Run `migrate` and `collectstatic --noinput`.
+4. On the Web tab: manual configuration with Python 3.13, the virtualenv path, `DJANGO_SETTINGS_MODULE = "config.settings"` in the WSGI file, static mappings `/static/` → `staticfiles` and `/media/` → `media`, Force HTTPS, then Reload.
 
-## Деплой на PythonAnywhere
+To update: `git pull`, `pip install -r requirements.txt`, `migrate`, `collectstatic`, Reload. Run the tests on your own machine: the free tier gives consoles 100 CPU seconds a day.
 
-Застосунок працює на безкоштовному тарифі PythonAnywhere (Python 3.13, SQLite). Gemini й USDA є в списку дозволених адрес безкоштовного тарифу, кулінарних сайтів і TheMealDB — немає, тому на сервері рецепти імпортуються текстом.
-
-1. **Bash-консоль:**
-   ```bash
-   git clone https://github.com/GreedyClark/Fridge_Recipe_App.git
-   cd Fridge_Recipe_App
-   python3.13 -m venv venv
-   source venv/bin/activate
-   pip install -r requirements.txt
-   ```
-2. **`.env`** — як локально, але `DEBUG=False`, `ALLOWED_HOSTS=<логін>.pythonanywhere.com`, `CSRF_TRUSTED_ORIGINS=https://<логін>.pythonanywhere.com` і новий `SECRET_KEY`.
-3. **База й статика:**
-   ```bash
-   python manage.py migrate
-   python manage.py collectstatic --noinput
-   ```
-4. **Вкладка Web** → Add a new web app → Manual configuration → Python 3.13:
-   - Virtualenv: `/home/<логін>/Fridge_Recipe_App/venv`
-   - WSGI-файл: шлях до проєкту в `sys.path` і `DJANGO_SETTINGS_MODULE = "config.settings"`
-   - Static files: `/static/` → `/home/<логін>/Fridge_Recipe_App/staticfiles`, `/media/` → `/home/<логін>/Fridge_Recipe_App/media`
-   - Force HTTPS: увімкнути, потім Reload
-
-Оновлення після нових комітів: `git pull`, `pip install -r requirements.txt`, `migrate`, `collectstatic`, Reload. Тести на сервері не запускай: безкоштовний тариф дає 100 секунд процесора на добу для консолей. Безкоштовний сайт треба продовжувати раз на місяць кнопкою на вкладці Web.
-
-## Джерело даних
-
-Частина спільних рецептів і їхні фото взяті з [TheMealDB](https://www.themealdb.com/) — відкритої бази рецептів. Тексти перекладено й перевірено вручну перед публікацією; на сторінці кожного такого рецепта є посилання на оригінал. Калорійність і БЖУ продуктів — з [USDA FoodData Central](https://fdc.nal.usda.gov/).
-
-## Тести
-
-**Звичайні тести** (моделі, логіка, сторінки):
+## Tests
 
 ```bash
 python manage.py test
 ```
 
-Тести не звертаються до мережі: USDA, Gemini, TheMealDB і завантаження сторінок підмінені.
+215 tests for models, services and views. USDA, Gemini, TheMealDB and page downloads are mocked, so the tests need no network.
 
-**Браузерні тести** (Playwright відкриває справжній Chromium і проходить головні сценарії: реєстрація → продукт → приготувати → скасувати, імпорт текстом, «Купив усе», двоє в одній сім'ї):
+Browser tests run four user flows in a real Chromium: sign up → add a product → cook → undo; import from text; "bought everything"; two members of one family sharing a fridge.
 
 ```bash
 pip install -r requirements-dev.txt
-playwright install chromium     # один раз, завантажує браузер
-pytest                          # тести з теки e2e/
-pytest --headed --slowmo 500    # те саме, але з видимим вікном браузера
+playwright install chromium
+pytest
+pytest --headed --slowmo 500    # watch the browser
 ```
 
-Gemini у браузерних тестах теж підмінений, але сторінки беруть Bootstrap і HTMX з CDN, тож потрібен інтернет.
+Gemini is mocked there too, but the pages load Bootstrap and HTMX from a CDN, so you need internet access.
 
-## Структура
+## Project layout
 
 ```
-accounts/            реєстрація, профіль, денна норма, сім'я
-  family.py          створення, приєднання, вихід; злиття й розділення продуктів
-fridge/              продукти, холодильник, список покупок
-  catalog.py         довідник із ~200 продуктів для імпорту з USDA
-  usda.py            клієнт USDA FoodData Central
-recipes/             рецепти, «Що приготувати?», журнал
-  services.py        підбір рецептів, порції, списання й повернення продуктів
-  importing/
-    fetch.py         безпечне завантаження сторінки
-    extract.py       JSON-LD або текст сторінки
-    gemini.py        розбір рецепта через Gemini
-    themealdb.py     клієнт TheMealDB
-    pipeline.py      посилання → чернетка
-    save.py          збереження й редагування рецепта
-e2e/                 браузерні тести pytest-playwright
-templates/           шаблони
-static/css/          тема оформлення
+accounts/          sign-up, profile, daily goal, family
+  family.py        create, join, leave; merging and splitting products
+fridge/            products, fridge, shopping list, USDA client
+recipes/           recipes, "What can I cook", journal, import
+  services.py      matching, servings, write-off and restore
+  importing/       fetch, extract, gemini, themealdb, save
+e2e/               pytest-playwright browser tests
+templates/         Django templates
+static/css/        theme
+docs/              screenshots
 ```
+
+## Data sources
+
+The shared recipes and their photos come from [TheMealDB](https://www.themealdb.com/); each of those recipes links to the original. Calories and macros come from [USDA FoodData Central](https://fdc.nal.usda.gov/).
